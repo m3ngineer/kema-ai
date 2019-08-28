@@ -17,5 +17,14 @@ def sms_reply():
     resp.message(' Got it, thanks for responding!')
     return str(resp)
 
+@app.route("/response", methods=['GET', 'POST'])
+def store_data():
+
+    # Print response
+    message_body = request.form['Body']
+    print(message_body)
+
+    return message_body
+
 if __name__ == "__main__":
     app.run(debug=True)
