@@ -1,5 +1,7 @@
 from flask import Flask, request, redirect
 from twilio.twiml.messaging_response import MessagingResponse
+from datetime import datetime
+import requests
 
 app = Flask(__name__)
 
@@ -20,11 +22,28 @@ def sms_reply():
 @app.route("/response", methods=['GET', 'POST'])
 def store_data():
 
-    # Print response
-    message_body = request.form['Body']
-    print(message_body)
+    if request.method == 'POST':
+        body = request.form.get('body') # data as bytes str
+        task = request.form.get('task')
+        barrier = request.form.get('barrier')
+        possibility = request.form.get('possibility')
+        schedule = request.form.get('schedule')
 
-    return message_body
+        data = {'task': str(task),
+                'barrier': str(barrier),
+                'possibility': str(possibility),
+                'schedule': str(schedule),
+                'date': datetime.now().strftime('%Y-%m-%d:%H:%m')}
+
+        print(data)
+        
+        # Make another post request
+        # response = requests.post(
+        #     url, data=json.dumps(data),
+        #     headers={'Content-Type': 'application/json'}
+        # )
+
+    return str(data)
 
 if __name__ == "__main__":
     app.run(debug=True)
