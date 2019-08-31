@@ -1,5 +1,6 @@
 import pandas as pd
 from datetime import datetime, timedelta
+import re
 
 def parse_date(text):
     '''
@@ -43,7 +44,7 @@ def parse_date(text):
         # assign to current date
         scheduled_date = current_date
 
-    elif days.any() in text:
+    elif days in text:
         # assign next available date equal to day
         weekday_phrases = [inner for outer in days.values() for inner in outer]
 
@@ -55,8 +56,40 @@ def parse_date(text):
 def parse_time(text):
     '''
     Parses time from human-readable text
+    Does not deal with minutes yet
     '''
-    pass
+
+    scheduled_time = datetime.strptime('12:00', '%H:%M').time()
+
+    current_time = datetime.now().time()
+
+    try:
+        ints_str = [str(i) for i in list(range(1, 25))]
+        if re.findall('at ?\d+\s?a?p?m?.*', text.lower()):
+            hour =  re.findall('at ?\d+\s?a?p?m?.*', text.lower())
+            hour = hour[0].replace('at', '').replace('pm', '').replace('am', '').replace(' ', '')
+        elif re.findall(' ?\d+ *a?p?m?.*', text.lower()):
+            print(2)
+            hour = re.findall(' ?\d+\s?a?p?m?.*', text.lower())
+            hour = hour[0].replace('at', '').replace('pm', '').replace('am', '').replace(' ', '')
+        else:
+            return scheduled_time
+
+        print(hour)
+        if 'pm' in text:
+            scheduled_time = datetime.striptime('{} PM'.format(hour), '%H %p').time()
+        elif 'am' in text:
+            scheduled_time = datetime.striptime('{} AM'.format(hour), '%H %p').time()
+        else:
+            # If user doesn't specify am/pm, choose most logical
+            if int(hour) in list(range(1,7)): # Likely PM
+                scheduled_time = datetime.strptime('{} PM'.format(hour), '%H %p').time()
+            else:
+                scheduled_time = datetime.strptime('{} AM'.format(hour), '%H %p').time()
+    except Exception as e:
+        print(e)
+
+    return scheduled_time
 
 def convert_to_datetime():
     '''
