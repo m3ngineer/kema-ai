@@ -24,7 +24,7 @@ def create_tables(drop_table=False):
 
     if drop_table:
         try:
-            sql = 'DROP TABLE {};'.format(table)
+            sql = 'DROP TABLE {};'.format(drop_table)
             conn.execute(sql)
             print('table {} dropped'.format(table))
         except:
@@ -38,7 +38,8 @@ def create_tables(drop_table=False):
             barrier VARCHAR,
             possibility VARCHAR,
             scheduled_time_text_input VARCHAR,
-            scheduled_time TIMESTAMP
+            scheduled_time TIMESTAMP,
+            update_time TIMESTAMP
             );
             """
 
