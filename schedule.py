@@ -113,7 +113,6 @@ class ScheduleJob():
                                             scheduled_date.day,
                                             scheduled_time.hour,
                                             )
-        print(datetime_as_str)
         scheduled_datetime = datetime.strptime(datetime_as_str, '%Y-%m-%d %H:%M')
 
         return scheduled_datetime
@@ -121,7 +120,9 @@ class ScheduleJob():
     def schedule_job(self, dt):
         '''
         Schedules a job given a datetime object
+        Returns scheduled date and confirmation id
         '''
+
         pass
 
 if __name__ == "__main__":
