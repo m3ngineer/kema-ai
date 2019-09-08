@@ -1,4 +1,5 @@
 from sqlalchemy import create_engine
+from datetime import datetime
 
 import conf
 
@@ -33,13 +34,15 @@ def create_tables(drop_table=False):
     # Create new tables
     create_table_sql  = """
             CREATE TABLE kema_ai (
-            id bigint PRIMARY KEY,
+            trigger_message_sid VARCHAR PRIMARY KEY,
+            user_phone VARCHAR,
+            trigger_text VARCHAR,
             task VARCHAR,
             barrier VARCHAR,
             possibility VARCHAR,
             scheduled_time_text_input VARCHAR,
             scheduled_time TIMESTAMP,
-            update_time TIMESTAMP
+            update_datetime TIMESTAMP
             );
             """
 
@@ -47,40 +50,41 @@ def create_tables(drop_table=False):
     print('kema_ai table created.')
     conn.close()
 
-def insert_into_table():
-    ''' Insert data into table '''
-
-    user_id = str(page_metrics['id'])
+def insert_into_table(data):
+    '''
+    Insert data from execution flow into table
+    data: dict {user_id: str, task: str, barrier: str, possibility: str, schedule:
+        str, date: datetime}
+    '''
 
     conn = connect_to_rds()
-    # Check if user_id already exists
-    query = "SELECT username FROM page_metrics WHERE user_id='{}'".format(user_id)
-    query_user_id = conn.execute(query)
 
-    if not query_user_id.fetchall(): # If ID not found
-        # Assign variables
-        username = page_metrics['username']
-        update_time = datetime.now().isoformat()
-        bio = page_metrics['biography']#.replace('\n', '')
-        video_timeline = page_metrics['edge_felix_video_timeline']
-        follows = page_metrics['edge_follow']
-        followers = page_metrics['edge_followed_by']
-        media_collections = page_metrics['edge_media_collections']
-        mutual_followed_by = page_metrics['edge_mutual_followed_by']
-        saved_media = page_metrics['edge_saved_media']
+    # Assign variables
+    trigger_message_sid = data['trigger_message_sid']
+    user_phone = data['username']
+    trigger_text = data['trigger_text']
+    task = data['task']#.replace('\n', '')
+    barrier = data['barrier']
+    possibility = data['possibility']
+    scheduled_time_text_input = data['scheduled_time_text_input']
+    scheduled_time = data['scheduled_time']
+    update_datetime = datetime.now().isoformat()
 
-        # Insert into table
-        insert_sql_page = """INSERT INTO page_metrics
-                        (user_id, username, update_time, biography , video_timeline, follows, followers,
-                        media_collections, mutual_followed_by, saved_media)
-                        VALUES ({}, '{}', '{}', $${}$$, {}, {}, {}, {}, {}, {})
-                    """.format(user_id, username, update_time, bio, video_timeline, follows, followers,
-                               media_collections, mutual_followed_by, saved_media)
+    # Insert into table
+    insert_sql = """INSERT INTO page_metrics
+                (trigger_message_sid, user_phone, trigger_text
+                task, barrier, possibility, scheduled_time_text_input,
+                scheduled_time, update_datetime)
+                VALUES ({}, {}, {}, {}, {}, {}, {}, {}, {})
+                """.format(trigger_message_sid, user_phone, trigger_text,
+                    task, barrier, possibility, scheduled_time_text_input,
+                    scheduled_time, update_datetime)
 
-        try:
-            conn.execute(text(insert_sql_page))
-            print('User {} inserted into post_metrics'.format(user_id))
+    try:
+        conn.execute(text(insert_sql))
+        print('Execution {} inserted into kema_ai'.format(trigger_message_sid))
 
-        except Exception as e:
-            raise
+    except Exception as e:
+        raise
+
     conn.close()
