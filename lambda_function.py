@@ -1,10 +1,9 @@
 import json
 import logging
 import sys
-from sqlalchemy import create_engine
-import pymysql
 import psycopg2
 import urllib
+from datetime import datetime
 
 import conf
 
@@ -16,61 +15,70 @@ def connect_to_rds(return_engine=False):
                     password=conf.RDS_password)
     return conn
 
-# try:
-#     connect_to_rds()
+def insert_into_table(data, conn):
+    '''
+    Insert data from execution flow into table
+    data: dict {user_id: str, task: str, barrier: str, possibility: str, schedule:
+        str, date: datetime}
+    '''
 
-# except:
-#     logger.error("ERROR: Unexpected error: Could not connect to MySql instance.")
-#     sys.exit()
+    # Assign variables
+    print(data)
+    trigger_message_sid = data['trigger_message_sid']
+    user_phone = data['user_phone']
+    trigger_text = data['trigger_text']
+    task = data['task'].replace('\n', '')
+    barrier = data['barrier']
+    possibility = data['possibility']
+    scheduled_time_text_input = data['scheduled_time_text_input']
+    scheduled_time = datetime.now().isoformat()
+    update_datetime = datetime.now().isoformat()
 
-# logger.info("SUCCESS: Connection to RDS mysql instance succeeded")
+    # Insert into table
+    insert_sql = """INSERT INTO kema_ai
+                (trigger_message_sid, user_phone, trigger_text,
+                task, barrier, possibility, scheduled_time_text_input,
+                scheduled_time, update_datetime)
+                VALUES ({}, {}, {}, {}, {}, {}, {}, {}, {})
+                """.format(trigger_message_sid, user_phone, trigger_text,
+                    task, barrier, possibility, scheduled_time_text_input,
+                    scheduled_time, update_datetime)
+    print(insert_sql)
+
+    cursor = conn.cursor()
+    cursor.execute(insert_sql)
+    conn.commit()
+    cursor.close()
 
 def lambda_handler(event, context):
+    ''' Inserts data from Twilio into RDS postgres database '''
 
-    # logging
+    # Set logging
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
     logger.info(event)
 
+    # Format data stream to dictionary
     data = urllib.parse.unquote(event['body'])
+    data = json.loads(data)
     logger.info(data)
 
-    def insert_into_table(data, conn):
-        '''
-        Insert data from execution flow into table
-        data: dict {user_id: str, task: str, barrier: str, possibility: str, schedule:
-            str, date: datetime}
-        '''
-
+    # Connect to RDS instance
+    try:
         conn = connect_to_rds()
+    except:
+        logger.error("ERROR: Unexpected error: Could not connect to psql RDS instance.")
+        sys.exit()
 
-        # Assign variables
-        print(data)
-        trigger_message_sid = data['trigger_message_sid']
-        user_phone = data['username']
-        trigger_text = data['trigger_text']
-        task = data['task']#.replace('\n', '')
-        barrier = data['barrier']
-        possibility = data['possibility']
-        scheduled_time_text_input = data['scheduled_time_text_input']
-        scheduled_time = data['scheduled_time']
-        update_datetime = datetime.now().isoformat()
+    logger.info("SUCCESS: Connection to psql RDS instance succeeded")
 
-        # Insert into table
-        insert_sql = """INSERT INTO kema_ai
-                    (trigger_message_sid, user_phone, trigger_text
-                    task, barrier, possibility, scheduled_time_text_input,
-                    scheduled_time, update_datetime)
-                    VALUES ({}, {}, {}, {}, {}, {}, {}, {}, {})
-                    """.format(trigger_message_sid, user_phone, trigger_text,
-                        task, barrier, possibility, scheduled_time_text_input,
-                        scheduled_time, update_datetime)
-
-        conn.execute(text(insert_sql))
-
-    conn = connect_to_rds()
-
-    insert_into_table(data, conn)
+    try:
+        insert_into_table(data, conn)
+    except:
+        logger.error("ERROR: Unexpected error: Could not insert data into psql RDS instance.")
+        logger.info()
+        sys.exit()
+    logger.info("SUCCESS: Inserted data into psql RDS instance")
 
     return {
         'statusCode': 200,
