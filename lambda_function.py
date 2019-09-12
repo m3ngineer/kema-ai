@@ -18,16 +18,16 @@ def connect_to_rds(return_engine=False):
 def insert_into_table(data, conn):
     '''
     Insert data from execution flow into table
-    data: dict {user_id: str, task: str, barrier: str, possibility: str, schedule:
-        str, date: datetime}
+    data: dict {trigger_message_sid: str, user_phone: str, task: str,
+        barrier: str, possibility: str, scheduled_time_text_input: str,
+        scheduled_time: datetime, update_datetime: datetime}
     '''
 
     # Assign variables
-    print(data)
     trigger_message_sid = data['trigger_message_sid']
     user_phone = data['user_phone']
     trigger_text = data['trigger_text']
-    task = data['task'].replace('\n', '')
+    task = data['task'] #.replace('\n', '')
     barrier = data['barrier']
     possibility = data['possibility']
     scheduled_time_text_input = data['scheduled_time_text_input']
@@ -39,7 +39,7 @@ def insert_into_table(data, conn):
                 (trigger_message_sid, user_phone, trigger_text,
                 task, barrier, possibility, scheduled_time_text_input,
                 scheduled_time, update_datetime)
-                VALUES ({}, {}, {}, {}, {}, {}, {}, {}, {})
+                VALUES ('{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}')
                 """.format(trigger_message_sid, user_phone, trigger_text,
                     task, barrier, possibility, scheduled_time_text_input,
                     scheduled_time, update_datetime)
@@ -72,6 +72,7 @@ def lambda_handler(event, context):
 
     logger.info("SUCCESS: Connection to psql RDS instance succeeded")
 
+    # Insert data into psql table
     try:
         insert_into_table(data, conn)
     except:
