@@ -19,7 +19,7 @@ class ScheduleJob():
                 Get the next weekday as a date given a date d
                 weekday: 0=Monday, 1=Tuesday...
             '''
-            print(weekday, d)
+
             days_ahead = weekday - d.weekday()
             if days_ahead <= 0: # Target day already happened this week
                 days_ahead += 7
@@ -50,10 +50,8 @@ class ScheduleJob():
             for word in text:
                 for weekday_phrase in weekday_phrases:
                     if word == weekday_phrase:
-                        for k,v in days.items():
-                            if v == weekday_phrase:
-                                weekday = k
-                                scheduled_date = next_weekday(current_date, weekday)
+                        weekday = word
+                        scheduled_date = next_weekday(current_date, weekday)
                         break
                 if found:
                     break
@@ -113,21 +111,12 @@ class ScheduleJob():
                                             scheduled_date.day,
                                             scheduled_time.hour,
                                             )
-        scheduled_datetime = datetime.strptime(datetime_as_str, '%Y-%m-%d %H:%M')
+        scheduled_datetime = datetime.strptime(datetime_as_str, '%Y-%m-%d %H:00')
 
         return scheduled_datetime
 
     def schedule_job(self, dt):
         '''
         Schedules a job given a datetime object
-        Returns scheduled date and confirmation id
         '''
-
         pass
-
-if __name__ == "__main__":
-
-    tests = ['toay at 4 pm', '4pm today', 'tomorrow', 'today', 'whenever', 'in 4 hours'
-    'end of day', 'eod', 'end of tomorrow', 'tomorrow afternoon']
-    print(parse_date('today at 4 pm'))
-    print(parse_date('next thurs at 4 pm'))
