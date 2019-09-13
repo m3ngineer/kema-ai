@@ -1,6 +1,7 @@
 import pandas as pd
 from datetime import datetime, timedelta
 import re
+import boto3
 
 class ScheduleJob():
     '''
@@ -119,4 +120,37 @@ class ScheduleJob():
         '''
         Schedules a job given a datetime object
         '''
+
+        # Convert dt to chron time
+        date = dt.date
+        time = dt.time
+        day = dt.day
+        weekday = dt.weekday()
+        hour = dt.hour - 1
+        min = dt.minute
+        chron_expr = '{}, {}, {}, {}, {}, {}'.format(*, *, *, *, *, *)
+
+        # Put an event rule
+        response = cloudwatch_events.put_rule(
+            Name='DEMO_EVENT',
+            RoleArn='IAM_ROLE_ARN',
+            ScheduleExpression='rate(5 minutes)',
+            State='ENABLED'
+        )
+        print(response['RuleArn'])
+
+        # Put target for rule
+        response = cloudwatch_events.put_targets(
+            Rule='DEMO_EVENT',
+            Targets=[
+                {
+                    'Arn': 'LAMBDA_FUNCTION_ARN',
+                    'Id': 'myCloudWatchEventsTarget',
+                }
+            ]
+        )
+        print(response)
+
+        # HOW END RESPONSE?
+
         pass
