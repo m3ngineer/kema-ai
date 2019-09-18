@@ -122,19 +122,20 @@ class ScheduleJob():
         '''
 
         # Convert dt to chron time
-        date = dt.date
-        time = dt.time
+        date = dt.date()
+        month = date.month
+        time = dt.time()
         day = dt.day
         weekday = dt.weekday()
         hour = dt.hour - 1
         min = dt.minute
-        chron_expr = '{}, {}, {}, {}, {}, {}'.format(*, *, *, *, *, *)
+        cron_expr = '{}, {}, {}, {}, {}, {}'.format(*, hour, day, month, *, *)
 
         # Put an event rule
         response = cloudwatch_events.put_rule(
             Name='DEMO_EVENT',
             RoleArn='IAM_ROLE_ARN',
-            ScheduleExpression='rate(5 minutes)',
+            ScheduleExpression='cron({})'.format(cron_expr),
             State='ENABLED'
         )
         print(response['RuleArn'])
