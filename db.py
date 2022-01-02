@@ -61,7 +61,7 @@ def insert_into_table(data):
 
     # Assign variables
     trigger_message_sid = data['trigger_message_sid']
-    user_phone = data['username']
+    user_phone = data['user_phone']
     trigger_text = data['trigger_text']
     task = data['task']#.replace('\n', '')
     barrier = data['barrier']
@@ -71,7 +71,7 @@ def insert_into_table(data):
     update_datetime = datetime.now().isoformat()
 
     # Insert into table
-    insert_sql = """INSERT INTO page_metrics
+    insert_sql = """INSERT INTO kema_ai
                 (trigger_message_sid, user_phone, trigger_text
                 task, barrier, possibility, scheduled_time_text_input,
                 scheduled_time, update_datetime)
@@ -88,3 +88,36 @@ def insert_into_table(data):
         raise
 
     conn.close()
+
+def lambda_handler(event, context, data):
+
+    if request.method == 'POST':
+        user_phone = request.form.get('user_phone')
+        trigger_text = request.form.get('trigger_text')
+        trigger_instance_sid = request.form.get('trigger_instance_sid')
+        body = request.form.get('body') # data as bytes str
+        task = request.form.get('task')
+        barrier = request.form.get('barrier')
+        possibility = request.form.get('possibility')
+        scheduled_time_text_input = request.form.get('schedule')
+        scheduled_time = parse_datetime(scheduled_time_text_input)
+
+        data = {
+                'trigger_message_sid': trigger_message_sid,
+                'user_phone': str(user_phone),
+                'trigger_text': str(trigger_text),
+                'task': str(task),
+                'barrier': str(barrier),
+                'possibility': str(possibility),
+                'scheduled_time_text_input': str(scheduled_time_text_input),
+                'scheduled_time': scheduled_time,
+                'update_datetime': datetime.now().strftime('%Y-%m-%d:%H:%m'),
+                }
+
+    connect_to_rds()
+    insert_into_table(data)
+
+    return {
+        'statusCode': 200,
+        'body': data,
+        }

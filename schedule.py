@@ -129,7 +129,7 @@ class ScheduleJob():
         weekday = dt.weekday()
         hour = dt.hour - 1
         min = dt.minute
-        cron_expr = '{}, {}, {}, {}, {}, {}'.format(*, hour, day, month, *, *)
+        cron_expr = '{}, {}, {}, {}, {}, {}'.format('*', hour, day, month, '*', '*')
 
         # Put an event rule
         response = cloudwatch_events.put_rule(
