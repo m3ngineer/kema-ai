@@ -47,7 +47,7 @@ def create_tables(drop_table=False):
             """
 
     conn.execute(create_table_sql)
-    print('kema_ai table created.')
+    print('Kema table created.')
     conn.close()
 
 def insert_into_table(data):
@@ -121,3 +121,6 @@ def lambda_handler(event, context, data):
         'statusCode': 200,
         'body': data,
         }
+
+if __name__ == '__main__':
+    create_tables()
