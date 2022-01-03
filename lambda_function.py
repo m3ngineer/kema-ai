@@ -5,6 +5,7 @@ import psycopg2
 import urllib
 from datetime import datetime
 
+from schedule import ScheduleJob
 import conf
 
 def connect_to_rds(return_engine=False):
@@ -31,7 +32,7 @@ def insert_into_table(data, conn):
     barrier = data['barrier']
     possibility = data['possibility']
     scheduled_time_text_input = data['scheduled_time_text_input']
-    scheduled_time = datetime.now().isoformat()
+    scheduled_time = ScheduleJob(scheduled_time_text_input).scheduled_datetime.isoformat()
     update_datetime = datetime.now().isoformat()
 
     # Insert into table
@@ -86,3 +87,21 @@ def lambda_handler(event, context):
         'body': json.dumps('Hello from Lambda!'),
         'data': event
     }
+
+def lambda_handler_send_reminder(event, context):
+
+    to = conf.twilio_num_to
+    from_ = conf.twilio_num_from_
+    send_reminder(to, from_)
+
+def send_reminder(to, from_):
+    ''' Executes Reminder flow in Twilio to send a reminder checkin text '''
+
+    client = Client(conf.twilio_account_sid, conf.twilio_auth_token)
+
+    execution = client.studio \
+                      .flows(conf.twilio_flow_sid) \
+                      .executions \
+                      .create(to=to, from_=from_)
+
+    print(execution.sid)
