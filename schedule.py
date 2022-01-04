@@ -5,13 +5,13 @@ import itertools
 from datetime import datetime, timedelta
 from calendar import monthrange
 
-class ScheduleJob():
+class ScheduleParser():
     '''
     Takes in human-readable text time and extracts datetime to schedule a job
     '''
-    def __init__(self, scheduled_deadline_text, scheduled_period_text):
-        self.scheduled_deadline = self.parse_date(scheduled_deadline_text)
-        self.scheduled_period = self.parse_period(scheduled_period_text)
+    def __init__(self, schedule_deadline_input, schedule_period_input):
+        self.schedule_start, self.schedule_end = self.parse_date(schedule_deadline_input)
+        self.schedule_weekdays = self.parse_period(schedule_period_input)
 
     def parse_date(self, text):
         '''
@@ -64,7 +64,7 @@ class ScheduleJob():
         text = [word.lower() for word in text.split()]
         current_date = datetime.now().date()
 
-        scheduled_deadline = current_date
+        schedule_start, schedule_end = current_date, current_date
 
         month = search_dict(text, months)
         if month:
@@ -75,12 +75,12 @@ class ScheduleJob():
                     list(str(i) for i in range(1,month_num_day+1))
                     )
             if day:
-                scheduled_date = datetime.date(
+                schedule_end = datetime.date(
                                     current_date.year,
                                     month,
                                     day
                                     )
-        return scheduled_date
+        return schedule_start.strftime('%Y-%m-%d'), schedule_end.strftime('%Y-%m-%d')
 
     def parse_period(self, text):
         '''
@@ -97,22 +97,22 @@ class ScheduleJob():
             6: ['sunday', 'sun', 'su'],
         }
 
-        periods = []
+        weekdays = []
 
         if 'daily' or 'everyday' in text.lower():
-            periods = list(range(7))
-        elif: 'weekend' in text.lower():
-            periods = [5,6]
+            weekdays = list(range(7))
+        elif 'weekend' in text.lower():
+            weekdays = [5,6]
         elif 'weekday' or 'week day' in text.lower():
-            periods = list(range(5))
+            weekdays = list(range(5))
         else:
             text = [word.lower() for word in text.split()]
             for word in text:
                 for day_int, day_text in days.items():
                     if word == day_text:
-                        period.append(day_int)
+                        weekdays.append(day_int)
 
-        return period
+        return ','.join(weekdays)
 
     def schedule_job(self, dt):
         '''

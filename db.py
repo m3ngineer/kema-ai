@@ -1,53 +1,52 @@
-from sqlalchemy import create_engine
+import psycopg2
 from datetime import datetime
 
+from schedule import ScheduleParser
 import conf
 
-def connect_to_rds(return_engine=False):
+def connect_to_rds():
     ''' Connects to RDS and returns connection '''
-    engine = create_engine(
-            "postgresql://{}:{}@{}/{}".format(
-                conf.RDS_user,
-                conf.RDS_password,
-                conf.RDS_host,
-                conf.RDS_db_name,
-                )
-            )
-    if return_engine:
-        return engine
 
-    conn = engine.connect()
+    conn = psycopg2.connect(database=conf.RDS_db_name,
+                    host=conf.RDS_host,
+                    user=conf.RDS_user,
+                    password=conf.RDS_password)
     return conn
 
 def create_tables(drop_table=False):
     ''' Creates post_metric table in RDS database '''
     conn = connect_to_rds()
+    cursor = conn.cursor()
 
     if drop_table:
         try:
             sql = 'DROP TABLE {};'.format(drop_table)
-            conn.execute(sql)
+            cursor.execute(sql)
             print('table {} dropped'.format(table))
         except:
             pass
 
     # Create new tables
     create_table_sql  = """
-            CREATE TABLE kema_ai (
+            CREATE TABLE kema_schedule (
             trigger_message_sid VARCHAR PRIMARY KEY,
             user_phone VARCHAR,
             trigger_text VARCHAR,
             task VARCHAR,
             barrier VARCHAR,
             possibility VARCHAR,
-            scheduled_time_text_input VARCHAR,
+            schedule_deadline_input VARCHAR,
+            schedule_period_input VARCHAR,
+            schedule_start DATETIME,
+            schedule_end DATETIME,
+            schedule_weekdays VARCHAR,
             scheduled_time TIMESTAMP,
             update_datetime TIMESTAMP
             );
             """
 
-    conn.execute(create_table_sql)
-    print('Kema table created.')
+    cursor.execute(create_table_sql)
+    print('kema_schedule table created.')
     conn.close()
 
 def insert_into_table(data):
@@ -58,6 +57,17 @@ def insert_into_table(data):
     '''
 
     conn = connect_to_rds()
+    cursor = conn.cursor()
+
+    schedule_parser = ScheduleParser(
+                        data['schedule_deadline_input'],
+                        data['schedule_period_input']
+                        )
+
+    logger = logging.getLogger()
+    logger.info(schedule_parser.schedule_start)
+    logger.info(schedule_parser.schedule_end)
+    logger.info(schedule_parser.schedule_weekdays)
 
     # Assign variables
     trigger_message_sid = data['trigger_message_sid']
@@ -66,61 +76,34 @@ def insert_into_table(data):
     task = data['task']#.replace('\n', '')
     barrier = data['barrier']
     possibility = data['possibility']
-    scheduled_time_text_input = data['scheduled_time_text_input']
-    scheduled_time = data['scheduled_time']
+    schedule_deadline_input = data['schedule_deadline_input']
+    schedule_period_input = data['schedule_period_input']
+    schedule_start = schedule_parser.schedule_start
+    schedule_end = schedule_parser.schedule_end
+    schedule_weekdays = schedule_parser.schedule_weekdays
+    schedule_time = datetime.now().isoformat()
     update_datetime = datetime.now().isoformat()
 
     # Insert into table
-    insert_sql = """INSERT INTO kema_ai
+    insert_sql = """INSERT INTO kema_schedule
                 (trigger_message_sid, user_phone, trigger_text
-                task, barrier, possibility, scheduled_time_text_input,
-                scheduled_time, update_datetime)
-                VALUES ({}, {}, {}, {}, {}, {}, {}, {}, {})
+                task, barrier, possibility, schedule_deadline_input,
+                schedule_period_input, schedule_start, schedule_end,
+                schedule_weekdays, schedule_time, update_datetime)
+                VALUES ({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}
                 """.format(trigger_message_sid, user_phone, trigger_text,
-                    task, barrier, possibility, scheduled_time_text_input,
-                    scheduled_time, update_datetime)
+                    task, barrier, possibility, schedule_deadline_input,
+                    schedule_period_input, schedule_start, schedule_end,
+                    schedule_weekdays, schedule_time, update_datetime)
 
     try:
-        conn.execute(text(insert_sql))
-        print('Execution {} inserted into kema_ai'.format(trigger_message_sid))
+        cursor.execute(text(insert_sql))
+        print('Execution {} inserted into kema_schedule'.format(trigger_message_sid))
 
     except Exception as e:
         raise
 
     conn.close()
 
-def lambda_handler(event, context, data):
-
-    if request.method == 'POST':
-        user_phone = request.form.get('user_phone')
-        trigger_text = request.form.get('trigger_text')
-        trigger_instance_sid = request.form.get('trigger_instance_sid')
-        body = request.form.get('body') # data as bytes str
-        task = request.form.get('task')
-        barrier = request.form.get('barrier')
-        possibility = request.form.get('possibility')
-        scheduled_time_text_input = request.form.get('schedule')
-        scheduled_time = parse_datetime(scheduled_time_text_input)
-
-        data = {
-                'trigger_message_sid': trigger_message_sid,
-                'user_phone': str(user_phone),
-                'trigger_text': str(trigger_text),
-                'task': str(task),
-                'barrier': str(barrier),
-                'possibility': str(possibility),
-                'scheduled_time_text_input': str(scheduled_time_text_input),
-                'scheduled_time': scheduled_time,
-                'update_datetime': datetime.now().strftime('%Y-%m-%d:%H:%m'),
-                }
-
-    connect_to_rds()
-    insert_into_table(data)
-
-    return {
-        'statusCode': 200,
-        'body': data,
-        }
-
 if __name__ == '__main__':
-    create_tables()
+    create_tables(drop_table=True)
