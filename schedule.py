@@ -1,29 +1,40 @@
-from datetime import datetime, timedelta
 import re
 import boto3
+import itertools
+
+from datetime import datetime, timedelta
+from calendar import monthrange
 
 class ScheduleJob():
     '''
     Takes in human-readable text time and extracts datetime to schedule a job
     '''
-    def __init__(self, text):
-        self.scheduled_datetime = self.parse_datetime(text)
+    def __init__(self, scheduled_deadline_text, scheduled_period_text):
+        self.scheduled_deadline = self.parse_date(scheduled_deadline_text)
+        self.scheduled_period = self.parse_period(scheduled_period_text)
 
     def parse_date(self, text):
         '''
         Parses date from human-readable text
         '''
 
-        def next_weekday(d, weekday):
-            '''
-                Get the next weekday as a date given a date d
-                weekday: 0=Monday, 1=Tuesday...
-            '''
+        def search_dict(text_list, dictionary):
+            ''' Searches a list of texts for values in a dictionary and
+            returns key of first matching value '''
 
-            days_ahead = weekday - d.weekday()
-            if days_ahead <= 0: # Target day already happened this week
-                days_ahead += 7
-            return d + timedelta(days_ahead)
+            intersection = set(itertools.chain(*dictionary.values())).intersection(set(text_list))
+            if len(intersection) > 0:
+                value = list(intersection)[0]
+                return next((k for k, v in input_dict.items() if value in v), None)
+            return None
+
+        def search_list(list1, list2):
+            ''' Returns first matching value in 2 lists '''
+
+            intersection = set(list1).intersection(set(list2))
+            if len(intersection) > 0:
+                return list(intersection)[0]
+            return None
 
         days = {
             0: ['monday', 'mon'],
@@ -35,85 +46,73 @@ class ScheduleJob():
             6: ['sunday', 'sun'],
         }
 
+        months = {
+            1: ['jan','january'],
+            2: ['feb','february'],
+            3: ['mar','march'],
+            4: ['apr','april'],
+            5: ['may'],
+            6: ['jun','june'],
+            7: ['jul','july'],
+            8: ['aug','august'],
+            9: ['sep','sept','september'],
+            10: ['oct','october'],
+            11: ['nov','november'],
+            12: ['dec','december']
+        }
+
         text = [word.lower() for word in text.split()]
         current_date = datetime.now().date()
-        scheduled_date = current_date
 
-        if 'today' in text:
-            return scheduled_date
-        elif 'tomorrow' in text:
-            return current_date + timedelta(1)
-        else:
-            weekday_phrases = [inner for outer in days.values() for inner in outer]
-            # get the next weekday date
-            found = False
-            for word in text:
-                for weekday_phrase in weekday_phrases:
-                    if word == weekday_phrase:
-                        weekday = word
-                        scheduled_date = next_weekday(current_date, weekday)
-                        break
-                if found:
-                    break
+        scheduled_deadline = current_date
 
-        # return date
+        month = search_dict(text, months)
+        if month:
+            month_num_day = monthrange(current_date.year, month)
+
+            day = search_list(
+                    text,
+                    list(str(i) for i in range(1,month_num_day+1))
+                    )
+            if day:
+                scheduled_date = datetime.date(
+                                    current_date.year,
+                                    month,
+                                    day
+                                    )
         return scheduled_date
 
-    def parse_time(self, text):
+    def parse_period(self, text):
         '''
-        Parses time from human-readable text
-        Does not deal with minutes yet
-        '''
-
-        scheduled_time = datetime.strptime('12:00', '%H:%M').time()
-
-        current_time = datetime.now().time()
-
-        try:
-            ints_str = [str(i) for i in list(range(1, 25))]
-            if re.findall('at ?\d+\s?a?p?m?.*', text.lower()):
-                hour =  re.findall('at ?\d+\s?a?p?m?.*', text.lower())
-                hour = hour[0].replace('at', '').replace('pm', '').replace('am', '').replace(' ', '')
-            elif re.findall(' ?\d+ *a?p?m?.*', text.lower()):
-                hour = re.findall(' ?\d+\s?a?p?m?.*', text.lower())
-                hour = hour[0].replace('at', '').replace('pm', '').replace('am', '').replace(' ', '')
-            else:
-                return scheduled_time
-
-            if 'pm' in text:
-                scheduled_time = datetime.strptime('{} PM'.format(hour), '%I %p').time()
-            elif 'am' in text:
-                scheduled_time = datetime.strptime('{} AM'.format(hour), '%I %p').time()
-            else:
-                # If user doesn't specify am/pm, choose most logical
-                if int(hour) in list(range(1,7)): # Likely PM
-                    scheduled_time = datetime.strptime('{} PM'.format(hour), '%I %p').time()
-                else:
-                    scheduled_time = datetime.strptime('{} AM'.format(hour), '%I %p').time()
-        except Exception as e:
-            print(e)
-
-        return scheduled_time
-
-    def parse_datetime(self, text):
-        '''
-        Converts date and time to datetime object
+        Parses periodicity (days of a week) from human-readable text
         '''
 
-        # Parse date and time
-        scheduled_date = self.parse_date(text)
-        scheduled_time = self.parse_time(text)
+        days = {
+            0: ['monday', 'mon', 'mo', 'm'],
+            1: ['tuesday', 'tues', 'tu'],
+            2: ['wednesday', 'wed', 'wednes', 'we', 'w'],
+            3: ['thursday', 'thurs', 'th'],
+            4: ['friday', 'fri', 'fr'],
+            5: ['saturday', 'sat', 'sa'],
+            6: ['sunday', 'sun', 'su'],
+        }
 
-        # Combine date and time
-        datetime_as_str = '{}-{}-{} {}:00'.format(
-                                            scheduled_date.year,
-                                            scheduled_date.month,
-                                            scheduled_date.day,
-                                            scheduled_time.hour,
-                                            )
-        scheduled_datetime = datetime.strptime(datetime_as_str, '%Y-%m-%d %H:00')
+        periods = []
 
-        return scheduled_datetime
+        if 'daily' or 'everyday' in text.lower():
+            periods = list(range(7))
+        elif: 'weekend' in text.lower():
+            periods = [5,6]
+        elif 'weekday' or 'week day' in text.lower():
+            periods = list(range(5))
+        else:
+            text = [word.lower() for word in text.split()]
+            for word in text:
+                for day_int, day_text in days.items():
+                    if word == day_text:
+                        period.append(day_int)
+
+        return period
 
     def schedule_job(self, dt):
         '''
