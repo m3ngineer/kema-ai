@@ -41,7 +41,7 @@ def create_tables(drop_table=False):
             schedule_start DATE,
             schedule_end DATE,
             schedule_weekdays VARCHAR,
-            scheduled_time TIMESTAMP,
+            schedule_time TIMESTAMP,
             update_datetime TIMESTAMP
             );
             """
@@ -92,15 +92,14 @@ def insert_into_table(data):
                 task, barrier, possibility, schedule_deadline_input,
                 schedule_period_input, schedule_start, schedule_end,
                 schedule_weekdays, schedule_time, update_datetime)
-                VALUES ("{}", "{}", "{}", "{}", "{}", "{}", "{}", "{}", "{}",
-                    "{}", "{}", "{}", "{}")
-                """.format(trigger_message_sid, user_phone, trigger_text,
-                    task, barrier, possibility, schedule_deadline_input,
-                    schedule_period_input, schedule_start, schedule_end,
-                    schedule_weekdays, schedule_time, update_datetime)
-    insert_sql = """select * from kema_schedule;"""
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """
+
     try:
-        cursor.execute(insert_sql)
+        cursor.execute(insert_sql, (trigger_message_sid, user_phone, trigger_text,
+            task, barrier, possibility, schedule_deadline_input,
+            schedule_period_input, schedule_start, schedule_end,
+            schedule_weekdays, schedule_time, update_datetime,))
         conn.commit()
         print('Execution {} inserted into kema_schedule'.format(trigger_message_sid))
 
@@ -109,11 +108,29 @@ def insert_into_table(data):
 
     conn.close()
 
+def select_from_table(query):
+    '''
+    Extract data from table
+    :param:query: str
+    '''
+
+    conn = connect_to_rds()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(sql)
+        r = cursor.fetchall()
+    except Exception as e:
+        raise
+
+    conn.close()
+    return r
+
 if __name__ == '__main__':
     create_tables(drop_table='kema_schedule')
     data = {
         'trigger_message_sid': 'test',
-        'user_phone':'1234567890',
+        'user_phone':conf.twilio_num_to,
         'trigger_text':'test',
         'task':'test',
         'barrier':'test',
