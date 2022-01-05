@@ -1,4 +1,5 @@
 import psycopg2
+import logging
 from datetime import datetime
 
 from schedule import ScheduleParser
@@ -37,8 +38,8 @@ def create_tables(drop_table=False):
             possibility VARCHAR,
             schedule_deadline_input VARCHAR,
             schedule_period_input VARCHAR,
-            schedule_start DATETIME,
-            schedule_end DATETIME,
+            schedule_start DATE,
+            schedule_end DATE,
             schedule_weekdays VARCHAR,
             scheduled_time TIMESTAMP,
             update_datetime TIMESTAMP
@@ -47,6 +48,7 @@ def create_tables(drop_table=False):
 
     cursor.execute(create_table_sql)
     print('kema_schedule table created.')
+    conn.commit()
     conn.close()
 
 def insert_into_table(data):
@@ -81,23 +83,25 @@ def insert_into_table(data):
     schedule_start = schedule_parser.schedule_start
     schedule_end = schedule_parser.schedule_end
     schedule_weekdays = schedule_parser.schedule_weekdays
-    schedule_time = datetime.now().isoformat()
-    update_datetime = datetime.now().isoformat()
+    schedule_time = datetime.now()
+    update_datetime = datetime.now()
 
     # Insert into table
     insert_sql = """INSERT INTO kema_schedule
-                (trigger_message_sid, user_phone, trigger_text
+                (trigger_message_sid, user_phone, trigger_text,
                 task, barrier, possibility, schedule_deadline_input,
                 schedule_period_input, schedule_start, schedule_end,
                 schedule_weekdays, schedule_time, update_datetime)
-                VALUES ({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}
+                VALUES ("{}", "{}", "{}", "{}", "{}", "{}", "{}", "{}", "{}",
+                    "{}", "{}", "{}", "{}")
                 """.format(trigger_message_sid, user_phone, trigger_text,
                     task, barrier, possibility, schedule_deadline_input,
                     schedule_period_input, schedule_start, schedule_end,
                     schedule_weekdays, schedule_time, update_datetime)
-
+    insert_sql = """select * from kema_schedule;"""
     try:
-        cursor.execute(text(insert_sql))
+        cursor.execute(insert_sql)
+        conn.commit()
         print('Execution {} inserted into kema_schedule'.format(trigger_message_sid))
 
     except Exception as e:
@@ -106,4 +110,17 @@ def insert_into_table(data):
     conn.close()
 
 if __name__ == '__main__':
-    create_tables(drop_table=True)
+    create_tables(drop_table='kema_schedule')
+    data = {
+        'trigger_message_sid': 'test',
+        'user_phone':'1234567890',
+        'trigger_text':'test',
+        'task':'test',
+        'barrier':'test',
+        'possibility':'test',
+        'schedule_deadline_input':'mar 1',
+        'schedule_period_input':'daily',
+        '':'',
+
+    }
+    insert_into_table(data)

@@ -1,6 +1,7 @@
 import re
 import boto3
 import itertools
+import logging
 
 from datetime import datetime, timedelta
 from calendar import monthrange
@@ -18,11 +19,14 @@ class ScheduleParser():
         Parses date from human-readable text
         '''
 
-        def search_dict(text_list, dictionary):
+        def search_dict(input_list, input_dict):
             ''' Searches a list of texts for values in a dictionary and
-            returns key of first matching value '''
+            returns key of first matching value
+            :param:input_list: list of text
+            :param:input_dict: dictionary with keys as integers and values as list of text
+            '''
 
-            intersection = set(itertools.chain(*dictionary.values())).intersection(set(text_list))
+            intersection = set(itertools.chain(*input_dict.values())).intersection(set(input_list))
             if len(intersection) > 0:
                 value = list(intersection)[0]
                 return next((k for k, v in input_dict.items() if value in v), None)
@@ -68,18 +72,17 @@ class ScheduleParser():
 
         month = search_dict(text, months)
         if month:
-            month_num_day = monthrange(current_date.year, month)
-
+            month_num_day = monthrange(current_date.year, month)[-1]
             day = search_list(
                     text,
                     list(str(i) for i in range(1,month_num_day+1))
                     )
             if day:
-                schedule_end = datetime.date(
+                schedule_end = datetime(
                                     current_date.year,
                                     month,
-                                    day
-                                    )
+                                    int(day)
+                                    ).date()
         return schedule_start.strftime('%Y-%m-%d'), schedule_end.strftime('%Y-%m-%d')
 
     def parse_period(self, text):
@@ -112,7 +115,7 @@ class ScheduleParser():
                     if word == day_text:
                         weekdays.append(day_int)
 
-        return ','.join(weekdays)
+        return ','.join([str(wkdy) for wkdy in weekdays])
 
     def schedule_job(self, dt):
         '''
