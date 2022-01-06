@@ -8,7 +8,7 @@ def send_reminder(to, from_):
     client = Client(conf.twilio_account_sid, conf.twilio_auth_token)
 
     execution = client.studio \
-                      .flows(conf.twilio_flow_sid) \
+                      .flows(conf.twilio_flow_reminder_sid) \
                       .executions \
                       .create(to=to, from_=from_) \
                       .update(status='ended')
