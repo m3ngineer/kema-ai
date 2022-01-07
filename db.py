@@ -108,7 +108,7 @@ def insert_into_table(data):
 
     conn.close()
 
-def select_from_table(query):
+def select_from_table(query, params=()):
     '''
     Extract data from table
     :param:query: str
@@ -118,7 +118,25 @@ def select_from_table(query):
     cursor = conn.cursor()
 
     try:
-        cursor.execute(sql)
+        cursor.execute(query, params)
+        r = cursor.fetchall()
+    except Exception as e:
+        raise
+
+    conn.close()
+    return r
+
+def update_table(query, params):
+    '''
+    :param: query: str
+    :param: params: tuple
+    '''
+
+    onn = connect_to_rds()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(query, params)
         r = cursor.fetchall()
     except Exception as e:
         raise
@@ -128,16 +146,16 @@ def select_from_table(query):
 
 if __name__ == '__main__':
     create_tables(drop_table='kema_schedule')
-    data = {
-        'trigger_message_sid': 'test',
-        'user_phone':conf.twilio_num_to,
-        'trigger_text':'test',
-        'task':'test',
-        'barrier':'test',
-        'possibility':'test',
-        'schedule_deadline_input':'mar 1',
-        'schedule_period_input':'daily',
-        '':'',
-
-    }
-    insert_into_table(data)
+    # data = {
+    #     'trigger_message_sid': 'test',
+    #     'user_phone':conf.twilio_num_to,
+    #     'trigger_text':'test',
+    #     'task':'test',
+    #     'barrier':'test',
+    #     'possibility':'test',
+    #     'schedule_deadline_input':'mar 1',
+    #     'schedule_period_input':'daily',
+    #     '':'',
+    #
+    # }
+    # insert_into_table(data)
