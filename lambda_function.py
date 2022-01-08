@@ -5,8 +5,56 @@ import psycopg2
 import urllib
 from datetime import datetime
 
-from db import connect_to_rds, insert_into_table
+from db import connect_to_rds, insert_into_table, select_from_table
+from reminder import reminder_node_1
 import conf
+
+def check_user_thread_position(user_phone, data):
+    ''' Checks for user's position in a flow '''
+
+    sql = ''' SELECT
+            trigger_message_sid, user_phone, thread_id, position_id, thread_data, update_datetime
+        FROM kema_thread
+        WHERE user_phone = %s
+        ORDER BY update_datetime DESC LIMIT 1'''
+    r = select_from_table(sql, (user_phone,))
+    if r:
+        return r[0][0], r[0][2], r[0][3]
+
+    return None, None, None
+
+def update_thread_position(data):
+    ''' Updates a user's position in a flow '''
+    pass
+
+def lambda_inbound_message_handler(event, context):
+
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+    logger.info(event)
+
+    # Format data stream to dictionary
+    data = urllib.parse.unquote(event['body'])
+    data = json.loads(data)
+    # data = event['body']
+    logger.info(data)
+
+    user_phone = data['user_phone']
+    # Check for position in previous conversation
+    trigger_message_sid, thread_id, position_id = check_user_thread_position(user_phone, data)
+    data['trigger_message_sid'] = trigger_message_sid
+    # If last conversation not ended
+    if thread_id:
+        # continue conversation
+        # Execute thread endpoint
+        if thread_id == '1' and position_id == '1':
+            reminder_node_1(data)
+            # Replace with API endpoint eventually
+
+    # Else start new conversation
+    else:
+        create_reminder()
+
 
 def lambda_handler(event, context):
     ''' Inserts data from Twilio into RDS postgres database '''
@@ -32,7 +80,7 @@ def lambda_handler(event, context):
 
     # Insert data into psql table
     try:
-        insert_into_table(data, conn)
+        insert_into_table(data, 'kema_schedule')
     except:
         logger.error("ERROR: Unexpected error: Could not insert data into psql RDS instance.")
         logger.debug(data)
@@ -45,20 +93,14 @@ def lambda_handler(event, context):
         'data': event
     }
 
-def lambda_handler_send_reminder(event, context):
+event = {
+"body": {
+    "user_phone": conf.twilio_num_to,
+    "from_": conf.twilio_num_from_,
+    "thread_id": "1",
+    "position_id": "1",
+    "response": "2"
+    }
+}
 
-    to = conf.twilio_num_to
-    from_ = conf.twilio_num_from_
-    send_reminder(to, from_)
-
-def send_reminder(to, from_):
-    ''' Executes Reminder flow in Twilio to send a reminder checkin text '''
-
-    client = Client(conf.twilio_account_sid, conf.twilio_auth_token)
-
-    execution = client.studio \
-                      .flows(conf.twilio_flow_sid) \
-                      .executions \
-                      .create(to=to, from_=from_)
-
-    print(execution.sid)
+# lambda_inbound_message_handler(event, None)
