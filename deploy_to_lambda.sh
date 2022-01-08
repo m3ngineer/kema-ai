@@ -4,6 +4,7 @@ mkdir lambda-deploy-pkg
 cp lambda_function.py lambda-deploy-pkg/lambda_function.py
 cp lambda_function_reminder.py lambda-deploy-pkg/lambda_function_reminder.py
 cp schedule.py lambda-deploy-pkg/schedule.py
+cp message.py lambda-deploy-pkg/message.py
 cp db.py lambda-deploy-pkg/db.py
 cp reminder.py lambda-deploy-pkg/reminder.py
 cp conf.py lambda-deploy-pkg/conf.py
