@@ -33,10 +33,10 @@ def send_reminder(to, from_, data={}):
                          to=to,
                      )
     thread_data = {
+        'trigger_message_sid': data['trigger_message_id'],
         'user_phone': to,
         'thread_id': '1',
         'position_id': '1',
-        'thread_data': data,
     }
 
     insert_into_table(thread_data, 'kema_thread')
@@ -80,7 +80,7 @@ def reminder_node_1(data):
         send_msg(msg, user_phone, from_)
 
     elif trigger_text == '2':
-        msg = '''What is the barrier?'''
+        msg = '''What is keeping you from completing this task?'''
         send_msg(msg, user_phone, from_)
         thread_id = '1'
         next_position_id = '2'
@@ -148,7 +148,7 @@ def reminder_node_2(data):
         '''
     update_table(sql, (trigger_message_sid,))
 
-    msg = ''' Got it! I'll remember that for the future. Just remember your possibility:  {}. You can do it!'''.format(possibility)
+    msg = ''' Got it! I'll remember that for the future. These are are the things that you said have blocked you from completing this task before: {}. Just remember your possibility:  {}. You can do it!'''.format(prev_barrier, possibility)
     send_msg(msg, user_phone, from_)
 
 if __name__ == "__main__":
