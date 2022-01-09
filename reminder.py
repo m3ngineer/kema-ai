@@ -28,7 +28,7 @@ def send_reminder(to, from_, data={}):
     task, barrier, possibility = data['task'], data['barrier'], data['possibility']
     message = client.messages \
                     .create(
-                         body="Hi! I'm checking in on your goal to {}. Have you completed this yet? 1 is yes, 2 if not.".format(task),
+                         body="Hi! I'm checking in on your goal to {}. Have you completed this yet? 1 if YES, 2 if NO.".format(task),
                          from_=from_,
                          to=to,
                      )
@@ -130,6 +130,219 @@ def reminder_node_2(data):
 
     # Update kema_schedule
     updt_barriers = ','.join([prev_barrier,new_barrier])
+
+    sql = '''
+        UPDATE kema_schedule
+        SET barrier = %s,
+            update_datetime = %s
+        WHERE trigger_message_sid = %s;
+        '''
+
+    params = (updt_barriers, current_date, trigger_message_sid,)
+    update_table(sql, params)
+
+    # Clear path
+    sql = '''
+        DELETE FROM kema_thread
+        WHERE trigger_message_sid = %s;
+        '''
+    update_table(sql, (trigger_message_sid,))
+
+    msg = ''' Got it! I'll remember that for the future. These are are the things that you said have blocked you from completing this task before: {}. Just remember your possibility:  {}. You can do it!'''.format(prev_barrier, possibility)
+    send_msg(msg, user_phone, from_)
+
+def create_reminder(data):
+    ''' Thread for setting up a new reminder '''
+
+    current_date = datetime.now()
+    trigger_message_sid = 'createtest' # How get trigger_message_sid from Twilio?
+    user_phone = data['user_phone']
+    from_ = conf.twilio_num_from_
+
+    # Intro
+    msg = '''Hello! Today is going to be a  great one :) What's one thing that you have been putting off or want to accomplish?'''
+    send_msg(msg, user_phone, from_)
+
+    thread_data = {
+        'trigger_message_sid': trigger_message_sid,
+        'user_phone': user_phone,
+        'thread_id': '0',
+        'position_id': '1',
+        'thread_data': json.dumps({'trigger_text': trigger_text})
+    }
+
+    insert_into_table(thread_data, 'kema_thread')
+
+def create_node_1(data):
+
+    # Accept answer from create_reminder()
+    current_date = datetime.now()
+    trigger_message_sid = data['trigger_message_sid']
+    trigger_text = data['trigger_text']
+    user_phone = data['user_phone']
+    from_ = conf.twilio_num_from_
+    thread_data = json.dumps({'task': trigger_text})
+    thread_id, position_id = ('0', '2')
+
+    sql = '''
+        UPDATE kema_thread
+        SET
+            position_id = %s,
+            thread_data = thread_data::jsonb || %s::jsonb,
+            update_datetime = %s
+        WHERE trigger_message_sid = %s
+            AND user_phone = %s
+            AND thread_id = %s;
+        '''
+
+    params = (position_id, thread_data, current_date, trigger_message_sid, user_phone, thread_id,)
+    update_table(sql, params)
+
+    # Barrier
+    msg = '''What has been holding you back from completing this? What are you afraid of?'''
+    send_msg(msg, user_phone, from_)
+
+def create_node_2(data):
+
+    # Accept answer from create_reminder()
+    current_date = datetime.now()
+    trigger_message_sid = data['trigger_message_sid']
+    trigger_text = data['trigger_text']
+    user_phone = data['user_phone']
+    from_ = conf.twilio_num_from_
+    thread_data = json.dumps({'barrier': trigger_text})
+    thread_id, position_id = ('0', '3')
+
+    sql = '''
+        UPDATE kema_thread
+        SET
+            position_id = %s,
+            thread_data = thread_data::jsonb || %s::jsonb,
+            update_datetime = %s
+        WHERE trigger_message_sid = %s
+            AND user_phone = %s
+            AND thread_id = %s;
+        '''
+
+    params = (position_id, thread_data, current_date, trigger_message_sid, user_phone, thread_id,)
+    update_table(sql, params)
+
+    # Possibility
+    msg = '''What's the consequence of not doing this thing? What possibility are you creating by doing this?'''
+    send_msg(msg, user_phone, from_)
+
+def create_node_3(data):
+
+    # Accept answer from create_reminder()
+    current_date = datetime.now()
+    trigger_message_sid = data['trigger_message_sid']
+    trigger_text = data['trigger_text']
+    user_phone = data['user_phone']
+    from_ = conf.twilio_num_from_
+    thread_data = json.dumps({'possibility': trigger_text})
+    thread_id, position_id = ('0', '4')
+
+    sql = '''
+        UPDATE kema_thread
+        SET
+            position_id = %s,
+            thread_data = thread_data::jsonb || %s::jsonb,
+            update_datetime = %s
+        WHERE trigger_message_sid = %s
+            AND user_phone = %s
+            AND thread_id = %s;
+        '''
+
+    params = (position_id, thread_data, current_date, trigger_message_sid, user_phone, thread_id,)
+    update_table(sql, params)
+
+    # Schedule deadline
+    msg = '''I'm so glad that you shared that with me :) Let's set a date for when you will accomplish this task by. When will you commit to doing this?'''
+    send_msg(msg, user_phone, from_)
+
+def create_node_4(data):
+
+    # Accept answer from create_reminder()
+    current_date = datetime.now()
+    trigger_message_sid = data['trigger_message_sid']
+    trigger_text = data['trigger_text']
+    user_phone = data['user_phone']
+    from_ = conf.twilio_num_from_
+    thread_data = json.dumps({'schedule_deadline_input': trigger_text})
+    thread_id, position_id = ('0', '5')
+
+    sql = '''
+        UPDATE kema_thread
+        SET
+            position_id = %s,
+            thread_data = thread_data::jsonb || %s::jsonb,
+            update_datetime = %s
+        WHERE trigger_message_sid = %s
+            AND user_phone = %s
+            AND thread_id = %s;
+        '''
+
+    params = (position_id, thread_data, current_date, trigger_message_sid, user_phone, thread_id,)
+    update_table(sql, params)
+
+    # Schedule period
+    msg = '''Great! I can send you weekly reminders before this deadline. What days would you like to be reminded? You can also say weekdays, daily, weekend, etc.'''
+    send_msg(msg, user_phone, from_)
+
+def create_node_5(data):
+
+    # Accept answer from create_reminder()
+    current_date = datetime.now()
+    trigger_message_sid = data['trigger_message_sid']
+    trigger_text = data['trigger_text']
+    user_phone = data['user_phone']
+    from_ = conf.twilio_num_from_
+    thread_data = json.dumps({'schedule_period_input': trigger_text})
+    thread_id, position_id = ('0', '6')
+
+    sql = '''
+        UPDATE kema_thread
+        SET
+            position_id = %s,
+            thread_data = thread_data::jsonb || %s::jsonb,
+            update_datetime = %s
+        WHERE trigger_message_sid = %s
+            AND user_phone = %s
+            AND thread_id = %s;
+        '''
+
+    params = (position_id, thread_data, current_date, trigger_message_sid, user_phone, thread_id,)
+    update_table(sql, params)
+
+    # Confirm Time
+    msg = '''Ok! I'll remind you on those days'''
+    send_msg(msg, user_phone, from_)
+
+    # Update kema_schedule with collected data over course of thread
+    # Extract thread data
+    sql = '''
+        SELECT trigger_message_sid, thread_data FROM kema_thread
+        WHERE
+            trigger_message_sid = %s,
+            user_phone = %s,
+            thread_id = %s;
+        '''
+    insert_data = select_from_table(sql, (trigger_message_sid, user_phone, thread_id,))
+    (_, thread_insert_data) = insert_data[0]
+
+    thread_insert_data_dict = {
+        'trigger_message_sid': trigger_message_sid,
+        'user_phone': user_phone,
+        'trigger_text': thread_insert_data['trigger_text'],
+        'task': thread_insert_data['task'],
+        'barrier': thread_insert_data['barrier'],
+        'possibility': thread_insert_data['possibility'],
+        'schedule_deadline_input': thread_insert_data['schedule_deadline_input'],
+        'schedule_period_input': thread_insert_data['schedule_period_input'],
+        ''
+    }
+
+    insert_into_table(thread_insert_data_dict, 'kema_schedule')
 
     sql = '''
         UPDATE kema_schedule

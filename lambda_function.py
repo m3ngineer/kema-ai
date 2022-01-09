@@ -6,7 +6,9 @@ import urllib
 from datetime import datetime
 
 from db import connect_to_rds, insert_into_table, select_from_table
-from reminder import reminder_node_1, reminder_node_2
+from reminder import reminder_node_1, reminder_node_2, create_reminder \
+    create_node_1, create_node_2, create_node_3, create_node_4, create_node_5, \
+    create_node_6
 import conf
 
 def check_user_thread_position(user_phone, data):
@@ -35,6 +37,12 @@ def lambda_inbound_message_handler(event, context):
     # data = event['body']
     logger.info(data)
 
+    ###### FOR TESTING ########
+    from twilio.rest import Client
+    from message import send_msg
+    send_msg('This is a test message', conf.twilio_num_to, conf.twilio_num_from_)
+    ###### FOR TESTING ########
+
     user_phone = data['user_phone']
     # Check for position in previous conversation
     trigger_message_sid, thread_id, position_id = check_user_thread_position(user_phone, data)
@@ -52,7 +60,24 @@ def lambda_inbound_message_handler(event, context):
         else:
             raise ValueError('position_id {} does not exist'.format(position_id))
 
-    # Else start new conversation
+    elif thread_id == '0':
+        # Continue conversation
+        if position_id == '1':
+            create_node_1(data) # Replace with API endpoint eventually
+        elif position_id == '2':
+            create_node_2(data)
+        elif position_id == '3':
+            create_node_3(data)
+        elif position_id == '4':
+            create_node_4(data)
+        elif position_id == '5':
+            create_node_5(data)
+        elif position_id == '6':
+            create_node_6(data)
+        else:
+            raise ValueError('position_id {} does not exist'.format(position_id))
+
+    # Else start new task
     else:
         create_reminder()
 

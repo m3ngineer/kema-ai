@@ -54,7 +54,7 @@ def create_tables(table, drop_table=False):
                 user_phone VARCHAR,
                 thread_id VARCHAR,
                 position_id VARCHAR,
-                thread_data VARCHAR,
+                thread_data JSONB,
                 update_datetime TIMESTAMP
                 );
                 """
@@ -125,16 +125,17 @@ def insert_into_table(data, table):
             user_phone = data['user_phone']
             thread_id = data['thread_id']
             position_id = data['position_id']
+            thread_data = data.get('thread_data') if data.get('thread_data') else json.dumps({})
             update_datetime = datetime.now()
 
             # Insert into table
             insert_sql = """INSERT INTO kema_thread
                         (trigger_message_sid, user_phone, thread_id, position_id,
-                        update_datetime)
-                        VALUES (%s, %s, %s, %s, %s)
+                        thread_data, update_datetime)
+                        VALUES (%s, %s, %s, %s, %s, %s)
                         """
             cursor.execute(insert_sql, (trigger_message_sid, user_phone, thread_id, position_id,
-                update_datetime,))
+                thread_data, update_datetime,))
             conn.commit()
             logger.info('Thread for user {} updated in kema_thread'.format(user_phone))
 
@@ -182,13 +183,32 @@ if __name__ == '__main__':
     # create_tables('kema_schedule', drop_table='kema_schedule')
     create_tables('kema_thread', drop_table='kema_thread')
     data = {
-        'trigger_message_sid': 'test',
+        'trigger_message_sid': 'createtest',
         'user_phone': conf.twilio_num_to,
         'thread_id': '1',
         'position_id': '1',
     }
 
     insert_into_table(data, 'kema_thread')
+
+    current_date = datetime.now()
+    trigger_message_sid = 'createtest'
+    user_phone = data['user_phone']
+    from_ = conf.twilio_num_from_
+    thread_data = json.dumps({"barrier": "barrier_test"})
+    sql = '''
+        UPDATE kema_thread
+        SET thread_data = thread_data::jsonb || %s::jsonb,
+            update_datetime = %s
+        WHERE trigger_message_sid = %s
+            AND user_phone = %s;
+        '''
+
+    params = (thread_data, current_date, trigger_message_sid, user_phone,)
+    update_table(sql, params)
+
+    r = select_from_table('select * from kema_thread;')
+    print(r)
 
     # data = {
     #     'trigger_message_sid': 'test',
