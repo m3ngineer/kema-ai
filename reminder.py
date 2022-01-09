@@ -43,18 +43,28 @@ def send_reminder(to, from_, data={}):
 
 def reminder_node_1(data):
 
-    # read response
+    # Read response
     current_date = datetime.now()
     trigger_message_sid = data['trigger_message_sid']
-    response = data['response']
+    trigger_text = data['trigger_text']
     user_phone = data['user_phone']
     from_ = conf.twilio_num_from_
-    print(data)
 
     # Determine actions based on response
-    if response == '1':
+    if trigger_text == '1':
         # Update kema_schedule database to end schedule
         trigger_message_sid = data['trigger_message_sid']
+
+        # Select past barrier
+        sql = """
+            SELECT DISTINCT
+                trigger_message_sid, barrier, possibility
+            FROM
+                kema_schedule
+            WHERE user_phone = %s;
+        """
+        prev_possibility = select_from_table(sql, (user_phone,))
+        (_, barrier, possibility) = prev_possibility[0]
 
         sql = '''
             UPDATE kema_schedule
@@ -63,47 +73,19 @@ def reminder_node_1(data):
             WHERE trigger_message_sid = %s
             '''
 
-        params = (current_date, current_date, trigger_message_sid)
+        params = (current_date, current_date, trigger_message_sid,)
         update_table(sql, params)
 
-        msg = '''Got it! Just remember your possibility:  {}. You can do it!'''.format(data['possibility'])
+        msg = '''Got it! Just remember your possibility:  {}. You can do it!'''.format(possibility)
         send_msg(msg, user_phone, from_)
 
-    elif response == '2':
+    elif trigger_text == '2':
         msg = '''What is the barrier?'''
         send_msg(msg, user_phone, from_)
         thread_id = '1'
-        position_id = '2'
+        next_position_id = '2'
 
-        # Extract barrier
-        new_barrier = data['response']
-
-        # Select past barrier
-        sql = """
-            SELECT DISTINCT
-                trigger_message_sid, barrier
-            FROM
-                kema_schedule
-            WHERE user_phone = %s;
-        """
-        prev_barriers = select_from_table(sql, (user_phone,))
-        (trigger_message_sid, prev_barrier) = prev_barriers[0]
-
-        # Update kema_schedule
-        updt_barriers = ','.join([prev_barrier,new_barrier])
-
-        sql = '''
-            UPDATE kema_schedule
-            SET barrier = %s,
-                update_datetime = %s
-            WHERE trigger_message_sid = %s;
-            '''
-
-        params = (updt_barriers, current_date, trigger_message_sid)
-        update_table(sql, params)
-
-        # Update kema_thread db
-
+        # Update position in kema_thread db
         sql = '''
             UPDATE kema_thread
             SET thread_id = %s,
@@ -112,12 +94,62 @@ def reminder_node_1(data):
             WHERE user_phone = %s;
             '''
 
-        params = (thread_id, position_id, current_date, user_phone,)
+        params = (thread_id, next_position_id, current_date, user_phone,)
         update_table(sql, params)
 
-        msg = ''' Got it! I'll remember that for the future. Just remember your possibility:  {}. You can do it!'''.format(data['possibility'])
+        return
+    else:
+        msg = ''' Sorry I didn't understand that. '''
         send_msg(msg, user_phone, from_)
 
+    # Clear path
+    sql = '''
+        DELETE FROM kema_thread
+        WHERE trigger_message_sid = %s;
+        '''
+    update_table(sql, (trigger_message_sid,))
+
+def reminder_node_2(data):
+
+    current_date = datetime.now()
+    trigger_message_sid = data['trigger_message_sid']
+    new_barrier = data['trigger_text']
+    user_phone = data['user_phone']
+    from_ = conf.twilio_num_from_
+
+    # Select past barrier
+    sql = """
+        SELECT DISTINCT
+            trigger_message_sid, barrier, possibility
+        FROM
+            kema_schedule
+        WHERE user_phone = %s;
+    """
+    prev_barriers = select_from_table(sql, (user_phone,))
+    (trigger_message_sid, prev_barrier, possibility) = prev_barriers[0]
+
+    # Update kema_schedule
+    updt_barriers = ','.join([prev_barrier,new_barrier])
+
+    sql = '''
+        UPDATE kema_schedule
+        SET barrier = %s,
+            update_datetime = %s
+        WHERE trigger_message_sid = %s;
+        '''
+
+    params = (updt_barriers, current_date, trigger_message_sid,)
+    update_table(sql, params)
+
+    # Clear path
+    sql = '''
+        DELETE FROM kema_thread
+        WHERE trigger_message_sid = %s;
+        '''
+    update_table(sql, (trigger_message_sid,))
+
+    msg = ''' Got it! I'll remember that for the future. Just remember your possibility:  {}. You can do it!'''.format(possibility)
+    send_msg(msg, user_phone, from_)
 
 if __name__ == "__main__":
     to = conf.twilio_num_to

@@ -6,7 +6,7 @@ import urllib
 from datetime import datetime
 
 from db import connect_to_rds, insert_into_table, select_from_table
-from reminder import reminder_node_1
+from reminder import reminder_node_1, reminder_node_2
 import conf
 
 def check_user_thread_position(user_phone, data):
@@ -22,10 +22,6 @@ def check_user_thread_position(user_phone, data):
         return r[0][0], r[0][2], r[0][3]
 
     return None, None, None
-
-def update_thread_position(data):
-    ''' Updates a user's position in a flow '''
-    pass
 
 def lambda_inbound_message_handler(event, context):
 
@@ -44,12 +40,17 @@ def lambda_inbound_message_handler(event, context):
     trigger_message_sid, thread_id, position_id = check_user_thread_position(user_phone, data)
     data['trigger_message_sid'] = trigger_message_sid
     # If last conversation not ended
-    if thread_id:
+    print(trigger_message_sid, thread_id, position_id)
+    if thread_id == '1':
         # continue conversation
-        # Execute thread endpoint
-        if thread_id == '1' and position_id == '1':
-            reminder_node_1(data)
-            # Replace with API endpoint eventually
+        if position_id == '1':
+            # Ask barrier
+            reminder_node_1(data) # Replace with API endpoint eventually
+        elif position_id == '2':
+            # Update barrier
+            reminder_node_2(data)
+        else:
+            raise ValueError('position_id {} does not exist'.format(position_id))
 
     # Else start new conversation
     else:
