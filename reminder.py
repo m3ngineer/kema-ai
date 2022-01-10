@@ -1,8 +1,9 @@
+import json
 from twilio.rest import Client
 from datetime import datetime
 
 from message import send_msg
-from db import update_table, select_from_table
+from db import update_table, select_from_table, insert_into_table
 import conf
 
 def execute_reminder_flow(to, from_, data={}):
@@ -155,7 +156,8 @@ def create_reminder(data):
     ''' Thread for setting up a new reminder '''
 
     current_date = datetime.now()
-    trigger_message_sid = 'createtest' # How get trigger_message_sid from Twilio?
+    trigger_message_sid = data['trigger_message_sid']
+    trigger_text = data['trigger_text']
     user_phone = data['user_phone']
     from_ = conf.twilio_num_from_
 
@@ -298,20 +300,16 @@ def create_node_5(data):
     user_phone = data['user_phone']
     from_ = conf.twilio_num_from_
     thread_data = json.dumps({'schedule_period_input': trigger_text})
-    thread_id, position_id = ('0', '6')
+    thread_id = '0'
 
     sql = '''
-        UPDATE kema_thread
-        SET
-            position_id = %s,
-            thread_data = thread_data::jsonb || %s::jsonb,
-            update_datetime = %s
+        DELETE FROM kema_thread
         WHERE trigger_message_sid = %s
             AND user_phone = %s
             AND thread_id = %s;
         '''
 
-    params = (position_id, thread_data, current_date, trigger_message_sid, user_phone, thread_id,)
+    params = (trigger_message_sid, user_phone, thread_id,)
     update_table(sql, params)
 
     # Confirm Time
@@ -339,7 +337,6 @@ def create_node_5(data):
         'possibility': thread_insert_data['possibility'],
         'schedule_deadline_input': thread_insert_data['schedule_deadline_input'],
         'schedule_period_input': thread_insert_data['schedule_period_input'],
-        ''
     }
 
     insert_into_table(thread_insert_data_dict, 'kema_schedule')

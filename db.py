@@ -153,6 +153,8 @@ def select_from_table(query, params=()):
     conn = connect_to_rds()
     cursor = conn.cursor()
 
+    logger = logging.getLogger()
+    logger.info(query)
     try:
         cursor.execute(query, params)
         r = cursor.fetchall()
@@ -185,27 +187,27 @@ if __name__ == '__main__':
     data = {
         'trigger_message_sid': 'createtest',
         'user_phone': conf.twilio_num_to,
-        'thread_id': '1',
+        'thread_id': '0',
         'position_id': '1',
     }
 
     insert_into_table(data, 'kema_thread')
 
-    current_date = datetime.now()
-    trigger_message_sid = 'createtest'
-    user_phone = data['user_phone']
-    from_ = conf.twilio_num_from_
-    thread_data = json.dumps({"barrier": "barrier_test"})
-    sql = '''
-        UPDATE kema_thread
-        SET thread_data = thread_data::jsonb || %s::jsonb,
-            update_datetime = %s
-        WHERE trigger_message_sid = %s
-            AND user_phone = %s;
-        '''
-
-    params = (thread_data, current_date, trigger_message_sid, user_phone,)
-    update_table(sql, params)
+    # current_date = datetime.now()
+    # trigger_message_sid = 'createtest'
+    # user_phone = data['user_phone']
+    # from_ = conf.twilio_num_from_
+    # thread_data = json.dumps({"barrier": "barrier_test"})
+    # sql = '''
+    #     UPDATE kema_thread
+    #     SET thread_data = thread_data::jsonb || %s::jsonb,
+    #         update_datetime = %s
+    #     WHERE trigger_message_sid = %s
+    #         AND user_phone = %s;
+    #     '''
+    #
+    # params = (thread_data, current_date, trigger_message_sid, user_phone,)
+    # update_table(sql, params)
 
     r = select_from_table('select * from kema_thread;')
     print(r)
