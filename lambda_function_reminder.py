@@ -45,7 +45,7 @@ def lambda_handler_send_reminder(event, context):
     # For every item in list
     from_ = conf.twilio_num_from_
     for (trigger_message_sid, to, task, possibility, barrier, schedule_start, schedule_end, schedule_weekdays) in reminders:
-        data = {'trigger_message_sid': trigger_message_sid, 'task':task.lower(), 'barrier':barrier.lower()}
+        data = {'trigger_message_sid': trigger_message_sid, 'task':task.lower(), 'barrier':barrier.lower(), 'possibility': possibility.lower()}
         send_reminder(to, from_, data=data)
 
     return {

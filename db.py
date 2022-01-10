@@ -153,8 +153,6 @@ def select_from_table(query, params=()):
     conn = connect_to_rds()
     cursor = conn.cursor()
 
-    logger = logging.getLogger()
-    logger.info(query)
     try:
         cursor.execute(query, params)
         r = cursor.fetchall()

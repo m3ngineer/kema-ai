@@ -1,6 +1,6 @@
 import json
 from twilio.rest import Client
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from message import send_msg
 from db import update_table, select_from_table, insert_into_table
@@ -34,7 +34,7 @@ def send_reminder(to, from_, data={}):
                          to=to,
                      )
     thread_data = {
-        'trigger_message_sid': data['trigger_message_id'],
+        'trigger_message_sid': data['trigger_message_sid'],
         'user_phone': to,
         'thread_id': '1',
         'position_id': '1',
@@ -67,17 +67,19 @@ def reminder_node_1(data):
         prev_possibility = select_from_table(sql, (user_phone,))
         (_, barrier, possibility) = prev_possibility[0]
 
+        # Update schedule_start to the next week
+        strt_nxt_wk = current_date + timedelta(7) - timedelta(days=current_date.isoweekday() % 7)
         sql = '''
             UPDATE kema_schedule
-            SET schedule_end = %s,
-                update_time = %s
+            SET schedule_start = %s,
+                update_datetime = %s
             WHERE trigger_message_sid = %s
             '''
 
-        params = (current_date, current_date, trigger_message_sid,)
+        params = (strt_nxt_wk, current_date, trigger_message_sid,)
         update_table(sql, params)
 
-        msg = '''Got it! Just remember your possibility:  {}. You can do it!'''.format(possibility)
+        msg = '''That's great! You're that much closer to the goal you set of: {}. You can do it!'''.format(possibility)
         send_msg(msg, user_phone, from_)
 
     elif trigger_text == '2':
