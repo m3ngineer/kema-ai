@@ -305,27 +305,26 @@ def create_node_5(data):
     thread_id = '0'
 
     sql = '''
-        DELETE FROM kema_thread
+        UPDATE kema_thread
+        SET
+            thread_data = thread_data::jsonb || %s::jsonb,
+            update_datetime = %s
         WHERE trigger_message_sid = %s
             AND user_phone = %s
             AND thread_id = %s;
         '''
 
-    params = (trigger_message_sid, user_phone, thread_id,)
+    params = (thread_data, current_date, trigger_message_sid, user_phone, thread_id,)
     update_table(sql, params)
-
-    # Confirm Time
-    msg = '''Ok! I'll remind you on those days'''
-    send_msg(msg, user_phone, from_)
 
     # Update kema_schedule with collected data over course of thread
     # Extract thread data
     sql = '''
         SELECT trigger_message_sid, thread_data FROM kema_thread
         WHERE
-            trigger_message_sid = %s,
-            user_phone = %s,
-            thread_id = %s;
+            trigger_message_sid = %s
+            AND user_phone = %s
+            AND thread_id = %s;
         '''
     insert_data = select_from_table(sql, (trigger_message_sid, user_phone, thread_id,))
     (_, thread_insert_data) = insert_data[0]
@@ -343,15 +342,9 @@ def create_node_5(data):
 
     insert_into_table(thread_insert_data_dict, 'kema_schedule')
 
-    sql = '''
-        UPDATE kema_schedule
-        SET barrier = %s,
-            update_datetime = %s
-        WHERE trigger_message_sid = %s;
-        '''
-
-    params = (updt_barriers, current_date, trigger_message_sid,)
-    update_table(sql, params)
+    # Confirm Time
+    msg = '''Ok! I'll remind you on those days'''
+    send_msg(msg, user_phone, from_)
 
     # Clear path
     sql = '''
@@ -359,9 +352,6 @@ def create_node_5(data):
         WHERE trigger_message_sid = %s;
         '''
     update_table(sql, (trigger_message_sid,))
-
-    msg = ''' Got it! I'll remember that for the future. These are are the things that you said have blocked you from completing this task before: {}. Just remember your possibility:  {}. You can do it!'''.format(prev_barrier, possibility)
-    send_msg(msg, user_phone, from_)
 
 if __name__ == "__main__":
     to = conf.twilio_num_to
