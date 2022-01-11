@@ -15,3 +15,6 @@ cd lambda-deploy-pkg
 zip -r ../lambda-deploy-pkg.zip .
 cd ..
 zip -g lambda-deploy-pkg.zip lambda_function.py schedule.py conf.py
+
+aws lambda update-function-code --function-name kema_text_buddy --zip-file fileb://lambda-deploy-pkg.zip
+aws lambda update-function-code --function-name kema_send_reminder --zip-file fileb://lambda-deploy-pkg.zip
