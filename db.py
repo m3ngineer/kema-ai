@@ -179,6 +179,30 @@ def update_table(query, params):
 
     conn.close()
 
+def update_thread_position(trigger_message_sid, thread_id, position_id, user_phone=None, clear_thread=False):
+    # Update position in kema_thread db
+
+    current_date = datetime.now()
+
+    sql = '''
+        UPDATE kema_thread
+        SET thread_id = %s,
+            position_id = %s,
+            update_datetime = %s
+        WHERE tigger_message_sid = %s
+        '''
+
+    params = (thread_id, position_id, current_date,)
+    if user_phone:
+        sql = sql + ''' AND user_phone = %s '''
+        params = params + user_phone
+
+    update_table(sql, params)
+
+    if clear_thread:
+        pass
+        # DELETE the thread from table
+
 if __name__ == '__main__':
     # create_tables('kema_schedule', drop_table='kema_schedule')
     create_tables('kema_thread', drop_table='kema_thread')
