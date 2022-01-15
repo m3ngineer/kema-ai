@@ -3,7 +3,7 @@ from twilio.rest import Client
 from datetime import datetime, timedelta
 
 from message import send_msg
-from db import update_table, select_from_table, insert_into_table
+from db import update_table, select_from_table, insert_into_table, update_thread_position
 import conf
 
 def execute_reminder_flow(to, from_, data={}):
@@ -89,16 +89,7 @@ def reminder_node_1(data):
         next_position_id = '2'
 
         # Update position in kema_thread db
-        sql = '''
-            UPDATE kema_thread
-            SET thread_id = %s,
-                position_id = %s,
-                update_datetime = %s
-            WHERE user_phone = %s;
-            '''
-
-        params = (thread_id, next_position_id, current_date, user_phone,)
-        update_table(sql, params)
+        update_thread_position(trigger_message_sid, thread_id=thread_id, position_id=next_position_id, user_phone=user_phone)
 
         return
     else:
@@ -106,11 +97,7 @@ def reminder_node_1(data):
         send_msg(msg, user_phone, from_)
 
     # Clear path
-    sql = '''
-        DELETE FROM kema_thread
-        WHERE trigger_message_sid = %s;
-        '''
-    update_table(sql, (trigger_message_sid,))
+    update_thread_position(trigger_message_sid, clear_thread=True)
 
 def reminder_node_2(data):
 
@@ -145,11 +132,7 @@ def reminder_node_2(data):
     update_table(sql, params)
 
     # Clear path
-    sql = '''
-        DELETE FROM kema_thread
-        WHERE trigger_message_sid = %s;
-        '''
-    update_table(sql, (trigger_message_sid,))
+    update_thread_position(trigger_message_sid, clear_thread=True)
 
     msg = ''' Got it! I'll remember that for the future. These are are the things that you said have blocked you from completing this task before: {}. Just remember your possibility:  {}. You can do it!'''.format(prev_barrier, possibility)
     send_msg(msg, user_phone, from_)
@@ -347,11 +330,7 @@ def create_node_5(data):
     send_msg(msg, user_phone, from_)
 
     # Clear path
-    sql = '''
-        DELETE FROM kema_thread
-        WHERE trigger_message_sid = %s;
-        '''
-    update_table(sql, (trigger_message_sid,))
+    update_thread_position(trigger_message_sid, clear_thread=True)
 
 if __name__ == "__main__":
     to = conf.twilio_num_to

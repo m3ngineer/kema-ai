@@ -179,11 +179,15 @@ def update_table(query, params):
 
     conn.close()
 
-def update_thread_position(trigger_message_sid, thread_id, position_id, user_phone=None, clear_thread=False):
-    # Update position in kema_thread db
+def update_thread_position(trigger_message_sid, thread_id=None, position_id=None, user_phone=None, clear_thread=False):
+    ''' Updates position_id in kema_thread db '''
 
     current_date = datetime.now()
 
+    if not clear_thread:
+        if not thread_id or not position_id:
+            raise ValueError('thread_id and position_id params are required.')
+            
     sql = '''
         UPDATE kema_thread
         SET thread_id = %s,
@@ -200,8 +204,11 @@ def update_thread_position(trigger_message_sid, thread_id, position_id, user_pho
     update_table(sql, params)
 
     if clear_thread:
-        pass
-        # DELETE the thread from table
+        sql = '''
+            DELETE FROM kema_thread
+            WHERE trigger_message_sid = %s;
+        '''
+        update_table(sql, (trigger_message_sid,))
 
 if __name__ == '__main__':
     # create_tables('kema_schedule', drop_table='kema_schedule')
