@@ -184,31 +184,30 @@ def update_thread_position(trigger_message_sid, thread_id=None, position_id=None
 
     current_date = datetime.now()
 
-    if not clear_thread:
-        if not thread_id or not position_id:
-            raise ValueError('thread_id and position_id params are required.')
-
-    sql = '''
-        UPDATE kema_thread
-        SET thread_id = %s,
-            position_id = %s,
-            update_datetime = %s
-        WHERE tigger_message_sid = %s
-        '''
-
-    params = (thread_id, position_id, current_date,)
-    if user_phone:
-        sql = sql + ''' AND user_phone = %s '''
-        params = params + user_phone
-
-    update_table(sql, params)
-
     if clear_thread:
         sql = '''
             DELETE FROM kema_thread
             WHERE trigger_message_sid = %s;
         '''
-        update_table(sql, (trigger_message_sid,))
+        params = (trigger_message_sid,)
+    else:
+        if not thread_id or not position_id:
+            raise ValueError('thread_id and position_id params are required.')
+
+        sql = '''
+            UPDATE kema_thread
+            SET thread_id = %s,
+                position_id = %s,
+                update_datetime = %s
+            WHERE trigger_message_sid = %s
+            '''
+
+        params = (thread_id, position_id, current_date, trigger_message_sid,)
+        if user_phone:
+            sql = sql + ''' AND user_phone = %s '''
+            params = params + tuple([user_phone])
+
+    update_table(sql, params)
 
 def clear_thread_for_user_phone(user_phone, exclude_trigger_message_sid=None):
     ''' Removes all threads for user_phone in db '''
@@ -222,7 +221,7 @@ def clear_thread_for_user_phone(user_phone, exclude_trigger_message_sid=None):
             WHERE user_phone = %s
                 AND trigger_message_sid <> %s;
             '''
-        params = params + exclude_trigger_message_sid
+        params = params + tuple([exclude_trigger_message_sid])
     else:
         sql = '''
             DELETE FROM kema_thread

@@ -7,6 +7,7 @@ from datetime import datetime
 
 from db import connect_to_rds, insert_into_table, select_from_table, clear_thread_for_user_phone
 from reminder import reminder_node_1, reminder_node_2, create_reminder, create_node_1, create_node_2, create_node_3, create_node_4, create_node_5
+from message import send_msg
 import conf
 
 def check_user_thread_position(user_phone, data):
@@ -50,6 +51,12 @@ def lambda_inbound_message_handler(event, context):
         # Clear any other threads
         clear_thread_for_user_phone(user_phone, exclude_trigger_message_sid=trigger_message_sid)
 
+    # Check for STOP request and exist all threads if found
+    if data['trigger_text'].lower() in ('stop', 'exit'):
+        clear_thread_for_user_phone(user_phone)
+        send_msg('Ok, restarting all conversations.', conf.twilio_num_to, conf.twilio_num_from_)
+        return
+
     # If last conversation not ended
     print(trigger_message_sid, thread_id, position_id)
     if thread_id == '1':
@@ -80,6 +87,7 @@ def lambda_inbound_message_handler(event, context):
 
     # Else start new task
     else:
+        print('Clearing thread')
         clear_thread_for_user_phone(user_phone)
         create_reminder(data)
 

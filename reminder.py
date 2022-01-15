@@ -54,7 +54,7 @@ def reminder_node_1(data):
     from_ = conf.twilio_num_from_
 
     # Determine actions based on response
-    if trigger_text == '1':
+    if trigger_text == '1' or trigger_text.lower() in ('yes'):
         # Update kema_schedule database to end schedule
         trigger_message_sid = data['trigger_message_sid']
 
@@ -84,7 +84,7 @@ def reminder_node_1(data):
         msg = '''That's great! You're that much closer to the goal you set of: {}. You can do it!'''.format(possibility)
         send_msg(msg, user_phone, from_)
 
-    elif trigger_text == '2':
+    elif trigger_text == '2' or trigger_text.lower() in ('no'):
         msg = '''What is keeping you from completing this task?'''
         send_msg(msg, user_phone, from_)
         thread_id = '1'
@@ -92,7 +92,7 @@ def reminder_node_1(data):
 
         # Update position in kema_thread db
         update_thread_position(trigger_message_sid, thread_id=thread_id, position_id=next_position_id, user_phone=user_phone)
-
+        print('updated thread position to ', thread_id, next_position_id)
         return
     else:
         msg = ''' Sorry I didn't understand that. '''
