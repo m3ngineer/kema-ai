@@ -5,7 +5,7 @@ import psycopg2
 import urllib
 from datetime import datetime
 
-from db import connect_to_rds, insert_into_table, select_from_table
+from db import connect_to_rds, insert_into_table, select_from_table, clear_thread_for_user_phone
 from reminder import reminder_node_1, reminder_node_2, create_reminder, create_node_1, create_node_2, create_node_3, create_node_4, create_node_5
 import conf
 
@@ -47,6 +47,9 @@ def lambda_inbound_message_handler(event, context):
     if trigger_message_sid:
         # Reset trigger message SID if continuing a conversation thread
         data['trigger_message_sid'] = trigger_message_sid
+        # Clear any other threads
+        clear_thread_for_user_phone(user_phone, exclude_trigger_message_sid=trigger_message_sid)
+
     # If last conversation not ended
     print(trigger_message_sid, thread_id, position_id)
     if thread_id == '1':
@@ -77,6 +80,7 @@ def lambda_inbound_message_handler(event, context):
 
     # Else start new task
     else:
+        clear_thread_for_user_phone(user_phone)
         create_reminder(data)
 
 

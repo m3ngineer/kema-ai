@@ -210,17 +210,25 @@ def update_thread_position(trigger_message_sid, thread_id=None, position_id=None
         '''
         update_table(sql, (trigger_message_sid,))
 
-def clear_thread_for_user_phone(user_phone):
+def clear_thread_for_user_phone(user_phone, exclude_trigger_message_sid=None):
     ''' Removes all threads for user_phone in db '''
 
     current_date = datetime.now()
 
-    sql = '''
-        DELETE FROM kema_thread
-        WHERE user_phone = %s;
-        '''
-
     params = (user_phone,)
+    if exclude_trigger_message_sid:
+        sql = '''
+            DELETE FROM kema_thread
+            WHERE user_phone = %s
+                AND trigger_message_sid <> %s;
+            '''
+        params = params + exclude_trigger_message_sid
+    else:
+        sql = '''
+            DELETE FROM kema_thread
+            WHERE user_phone = %s;
+            '''
+
     update_table(sql, params)
 
 if __name__ == '__main__':
