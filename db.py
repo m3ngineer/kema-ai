@@ -187,7 +187,7 @@ def update_thread_position(trigger_message_sid, thread_id=None, position_id=None
     if not clear_thread:
         if not thread_id or not position_id:
             raise ValueError('thread_id and position_id params are required.')
-            
+
     sql = '''
         UPDATE kema_thread
         SET thread_id = %s,
@@ -209,6 +209,19 @@ def update_thread_position(trigger_message_sid, thread_id=None, position_id=None
             WHERE trigger_message_sid = %s;
         '''
         update_table(sql, (trigger_message_sid,))
+
+def clear_thread_for_user_phone(user_phone):
+    ''' Removes all threads for user_phone in db '''
+
+    current_date = datetime.now()
+
+    sql = '''
+        DELETE FROM kema_thread
+        WHERE user_phone = %s;
+        '''
+
+    params = (user_phone,)
+    update_table(sql, params)
 
 if __name__ == '__main__':
     # create_tables('kema_schedule', drop_table='kema_schedule')

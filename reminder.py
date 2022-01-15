@@ -3,7 +3,7 @@ from twilio.rest import Client
 from datetime import datetime, timedelta
 
 from message import send_msg
-from db import update_table, select_from_table, insert_into_table, update_thread_position
+from db import update_table, select_from_table, insert_into_table, update_thread_position, clear_thread_for_user_phone
 import conf
 
 def execute_reminder_flow(to, from_, data={}):
@@ -25,6 +25,8 @@ def send_reminder(to, from_, data={}):
     account_sid = conf.twilio_account_sid
     auth_token = conf.twilio_auth_token
     client = Client(account_sid, auth_token)
+
+    clear_thread_for_user_phone(to)
 
     task, barrier, possibility = data['task'], data['barrier'], data['possibility']
     message = client.messages \
