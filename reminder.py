@@ -28,21 +28,47 @@ def send_reminder(to, from_, data={}):
 
     clear_thread_for_user_phone(to)
 
-    task, barrier, possibility = data['task'], data['barrier'], data['possibility']
-    message = client.messages \
-                    .create(
-                         body="Hi! I'm checking in on your goal to {}. Have you completed this yet? 1 if YES, 2 if NO.".format(task),
-                         from_=from_,
-                         to=to,
-                     )
-    thread_data = {
-        'trigger_message_sid': data['trigger_message_sid'],
-        'user_phone': to,
-        'thread_id': '1',
-        'position_id': '1',
-    }
+    if len(data) > 1:
+        # Multiple tasks found
+        tasks = '\n  '.join(['{}. {}'.format(i+1, datum['task']) for i, datum in enumerate(data)])
+        for i, data in enumerate(data):
+            if i == 0:
+                message = client.messages \
+                                .create(
+                                     body="Hi there! I'm checking in on your goals.\n  {}.\nHave you completed number {} yet?\n\n1 if YES, 2 if NO.".format(tasks, i+1),
+                                     from_=from_,
+                                     to=to,
+                                 )
+            else:
+                # Record answer
+                return
+                message = client.messages \
+                                .create(
+                                     body="Have you completed number {} yet? 1 if YES, 2 if NO.".format(i),
+                                     from_=from_,
+                                     to=to,
+                                 )
 
-    insert_into_table(thread_data, 'kema_thread')
+    elif len(data) == 1:
+        data = data[0]
+        task, barrier, possibility = data['task'], data['barrier'], data['possibility']
+        message = client.messages \
+                        .create(
+                             body="Hi there! I'm checking in on your goal to {}. Have you completed this yet? 1 if YES, 2 if NO.".format(task),
+                             from_=from_,
+                             to=to,
+                         )
+        thread_data = {
+            'trigger_message_sid': data['trigger_message_sid'],
+            'user_phone': to,
+            'thread_id': '1',
+            'position_id': '1',
+        }
+
+        insert_into_table(thread_data, 'kema_thread')
+    else:
+        # No data found
+        return
 
 def reminder_node_1(data):
 
@@ -61,13 +87,13 @@ def reminder_node_1(data):
         # Select past barrier
         sql = """
             SELECT DISTINCT
-                trigger_message_sid, barrier, possibility
+                trigger_message_sid, barrier, possibility, COUNT(trigger_message_sid) OVER (PARTITION BY user_phone) AS num_task,
             FROM
                 kema_schedule
             WHERE user_phone = %s;
         """
         prev_possibility = select_from_table(sql, (user_phone,))
-        (_, barrier, possibility) = prev_possibility[0]
+        (_, barrier, possibility, num_task) = prev_possibility[0]
 
         # Update schedule_start to the next week
         strt_nxt_wk = current_date + timedelta(7) - timedelta(days=current_date.isoweekday() % 7)
@@ -337,4 +363,5 @@ def create_node_5(data):
 if __name__ == "__main__":
     to = conf.twilio_num_to
     from_ = conf.twilio_num_from_
-    send_reminder(to, from_)
+    data = [{'trigger_message_sid': 'test', 'user_phone': '+19148198579', 'task': 'test', 'possibility': 'test', 'barrier': 'test,2,2,2,Time,Time,Time,Time', 'schedule_start': '2022-01-16', 'schedule_end': '2022-03-01', 'schedule_weekdays': '0,1,2,3,4,5,6'}, {'trigger_message_sid': 'SMa126b917d45093ebea2189025edfc8db', 'user_phone': '+19148198579', 'task': 'Writing a health Econ article', 'possibility': 'Becoming a health tech company revolutionary', 'barrier': 'Perfection,Time,Not enough time,Time to do it,Doing too much,Not setting a schedule', 'schedule_start': '2022-01-11', 'schedule_end': '2022-01-31', 'schedule_weekdays': '0,1,2,3,4,5,6'}]
+    send_reminder(to, from_, data=data)
