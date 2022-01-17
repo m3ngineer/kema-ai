@@ -19,6 +19,14 @@ def execute_reminder_flow(to, from_, data={}):
     print('Sent message {}'.format(execution.sid))
 
 
+def set_active_task(task_list):
+    for i, task in enumerate(task_list):
+        if i == 0:
+            task['status'] = 'active'
+        else:
+            task['status'] = 'dormant'
+    return task_list
+
 def send_reminder(to, from_, data={}):
     ''' Executes thread to check-in on goal progress '''
 
@@ -31,23 +39,25 @@ def send_reminder(to, from_, data={}):
     if len(data) > 1:
         # Multiple tasks found
         tasks = '\n  '.join(['{}. {}'.format(i+1, datum['task']) for i, datum in enumerate(data)])
-        for i, data in enumerate(data):
-            if i == 0:
-                message = client.messages \
-                                .create(
-                                     body="Hi there! I'm checking in on your goals.\n  {}.\nHave you completed number {} yet?\n\n1 if YES, 2 if NO.".format(tasks, i+1),
-                                     from_=from_,
-                                     to=to,
-                                 )
-            else:
-                # Record answer
-                return
-                message = client.messages \
-                                .create(
-                                     body="Have you completed number {} yet? 1 if YES, 2 if NO.".format(i),
-                                     from_=from_,
-                                     to=to,
-                                 )
+        message = client.messages \
+                        .create(
+                             body="Hi there! I'm checking in on your goals.\n  {}.\nLet's go in order. Have you completed number {} yet?\n\n1 if YES, 2 if NO.".format(tasks, i+1),
+                             from_=from_,
+                             to=to,
+                         )
+
+        data = set_active_task(data)
+        active_task_data = data[0]
+
+        thread_data = {
+            'trigger_message_sid': active_task_data['trigger_message_sid'],
+            'user_phone': to,
+            'thread_id': '1',
+            'position_id': '3',
+            'thread_data': json.dumps(data)
+        }
+
+        insert_into_table(thread_data, 'kema_thread')
 
     elif len(data) == 1:
         data = data[0]
@@ -164,6 +174,148 @@ def reminder_node_2(data):
 
     msg = ''' Got it! I'll remember that for the future. These are are the things that you said have blocked you from completing this task before: {}. Just remember your possibility:  {}. You can do it!'''.format(prev_barrier, possibility)
     send_msg(msg, user_phone, from_)
+
+
+def reminder_node_3(data):
+    """  Multi-task version of reminder_node_1 """
+
+    # data = [{'user_phone': '123', 'task': 'task1', 'trigger_message_sid': 'sid1', 'status': 'test'}, {'user_phone': '123', 'task': 'task2', 'trigger_message_sid': 'sid2', 'status': 'dormant'}]
+
+    # Read response
+    current_date = datetime.now()
+    trigger_message_sid = data['trigger_message_sid']
+    trigger_text = data['trigger_text']
+    user_phone = data['user_phone']
+    from_ = conf.twilio_num_from_
+
+    # Extract thread_data from kema_thread
+    sql = '''
+        SELECT trigger_message_sid, thread_data FROM kema_thread
+        WHERE
+            trigger_message_sid = %s
+            AND user_phone = %s
+            AND thread_id = %s;
+        '''
+    thread_data_extract = select_from_table(sql, (trigger_message_sid, user_phone, thread_id,))
+    (_, thread_data) = thread_data_extract[0]
+    # thread_data: [{1, active}, {2, dormant}]
+
+    # reminder_node_1:
+    # check for thread_data length:
+    # if more than 1 task:
+
+    # reminder_node_3:
+    # check length of thread_data:
+    # if more than 1 task:
+        # check response:
+        # if response is completed:
+            # perform actions to complete response
+        # if response is not completed:
+            # request additional barrier
+            # set position for reminder_node_4
+
+        # set new active task
+        # set position_id to route to reminder_node_1
+        # update kema_thread to next trigger_message_sid
+        # update kema_thread with new thread_data and trigger_message_sid
+
+        # Send message asking for completion of next task
+
+    # if only 1 task remaining:
+        # if response is completed:
+
+        # else if response is not completed:
+            # request additional barrier
+            # reminder_node_2
+
+
+    # Determine actions based on response
+    if trigger_text == '1' or trigger_text.lower() in ('yes'):
+        # 1. Update kema_schedule database to end schedule
+            # set thread to 3
+        # 2. ask for barrier
+    # if >1 remaining tasks: remove active data from kema_thread, set next task as active
+    # if 1 remaining task: set position id = 2
+    active_task_data = thread_data[0]
+
+        # Update kema_schedule database to end schedule
+        # Select past barrier
+        sql = """
+            SELECT DISTINCT
+                trigger_message_sid, barrier, possibility
+            FROM
+                kema_schedule
+            WHERE user_phone = %s;
+        """
+        prev_possibility = select_from_table(sql, (user_phone,))
+        (_, barrier, possibility) = prev_possibility[0]
+
+        # Update schedule_start to the next week
+        strt_nxt_wk = current_date + timedelta(7) - timedelta(days=current_date.isoweekday() % 7)
+        sql = '''
+            UPDATE kema_schedule
+            SET schedule_start = %s,
+                update_datetime = %s
+            WHERE trigger_message_sid = %s
+            '''
+
+        params = (strt_nxt_wk, current_date, trigger_message_sid,)
+        update_table(sql, params)
+
+        msg = '''That's great! You're that much closer to the goal you set of: {}. You can do it!'''.format(possibility)
+        send_msg(msg, user_phone, from_)
+
+        if len(thread_data) > 1:
+            thread_data = [thr_datum for thr_datum in thread_data if thr_datum['status'] == 'active']
+            thread_data = set_active_task(thread_data)
+            active_data = thread_data[0]
+            if len(thread_data) > 1:
+                position_id = '3' # Go to next task
+                new_trigger_message_sid = active_data['trigger_message_sid']
+            else:
+                 position_id = '3' # What happens if this is the last task?
+
+            # Update kema_thread
+            sql = '''
+                UPDATE kema_thread
+                SET
+                    trigger_message_sid = %s,
+                    position_id = %s,
+                    thread_data = %s,
+                    update_datetime = %s
+                WHERE trigger_message_sid = %s
+                    AND user_phone = %s
+                    AND thread_id = %s;
+                '''
+
+            params = (new_trigger_message_sid, position_id, thread_data, current_date, trigger_message_sid, user_phone, thread_id,)
+            update_table(sql, params)
+
+            # update_thread_position(trigger_message_sid, thread_id='1', position_id=position_id)
+
+            message = client.messages \
+                            .create(
+                                 body="Have you completed number {} yet? 1 if YES, 2 if NO.".format(i),
+                                 from_=from_,
+                                 to=to,
+                             )
+
+    elif trigger_text == '2' or trigger_text.lower() in ('no'):
+        msg = '''What is keeping you from completing this task?'''
+        send_msg(msg, user_phone, from_)
+        thread_id = '1'
+        next_position_id = '2'
+
+        # Update position in kema_thread db
+        update_thread_position(trigger_message_sid, thread_id=thread_id, position_id=next_position_id, user_phone=user_phone)
+        print('updated thread position to ', thread_id, next_position_id)
+        return
+    else:
+        msg = ''' Sorry I didn't understand that. '''
+        send_msg(msg, user_phone, from_)
+
+    # # Clear path
+    # update_thread_position(trigger_message_sid, clear_thread=True)
 
 def create_reminder(data):
     ''' Thread for setting up a new reminder '''
