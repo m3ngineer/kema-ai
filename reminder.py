@@ -203,6 +203,12 @@ def reminder_node_3(data):
     # reminder_node_1:
     # check for thread_data length:
     # if more than 1 task:
+        # reminder_node_3
+        # if barrier --> reminder_node_4
+        # else --> reminder_node_3?
+    # else:
+        # if barrier --> reminder_node_2 
+        # else --> finish
 
     # reminder_node_3:
     # check length of thread_data:
