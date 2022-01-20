@@ -1,5 +1,3 @@
-rm -R lambda-deploy-pkg
-rm -R lambda-deploy-pkg.zip
 mkdir lambda-deploy-pkg
 cp lambda_function.py lambda-deploy-pkg/lambda_function.py
 cp lambda_function_reminder.py lambda-deploy-pkg/lambda_function_reminder.py
@@ -18,3 +16,6 @@ zip -g lambda-deploy-pkg.zip lambda_function.py schedule.py conf.py
 
 aws lambda update-function-code --function-name kema_text_buddy --zip-file fileb://lambda-deploy-pkg.zip
 aws lambda update-function-code --function-name kema_send_reminder --zip-file fileb://lambda-deploy-pkg.zip
+
+rm -R lambda-deploy-pkg
+rm -R lambda-deploy-pkg.zip
