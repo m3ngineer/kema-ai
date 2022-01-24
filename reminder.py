@@ -141,6 +141,8 @@ def reminder_node_1(data):
 
 def reminder_node_2(data):
 
+    print('start reminder_node_2')
+
     current_date = datetime.now()
     trigger_message_sid = data['trigger_message_sid']
     new_barrier = data['trigger_text']
@@ -153,9 +155,10 @@ def reminder_node_2(data):
             trigger_message_sid, barrier, possibility
         FROM
             kema_schedule
-        WHERE user_phone = %s;
+        WHERE user_phone = %s
+            AND trigger_message_sid = %s;
     """
-    prev_barriers = select_from_table(sql, (user_phone,))
+    prev_barriers = select_from_table(sql, (user_phone, trigger_message_sid,))
     (trigger_message_sid, prev_barrier, possibility) = prev_barriers[0]
 
     # Update kema_schedule
@@ -176,6 +179,8 @@ def reminder_node_2(data):
 
     msg = ''' Got it! I'll remember that for the future. These are are the things that you said have blocked you from completing this task before: {}. Just remember your possibility:  {}. You can do it!'''.format(prev_barrier, possibility)
     send_msg(msg, user_phone, from_)
+
+    print('finished reminder_node_2')
 
 
 def reminder_node_3(data):
@@ -376,7 +381,11 @@ def reminder_node_4(data):
 
 
     # Send status check for next task
+    print('tasks')
+    print(thread_data.get('tasks'))
     if len(thread_data.get('tasks')) > 1:
+        print('true')
+        print(thread_data)
         thread_data['tasks'] = [thr_datum for thr_datum in thread_data['tasks'] if thr_datum['status'] != 'active']
         thread_data['tasks'] = set_active_task(thread_data['tasks'])
         active_data = thread_data['tasks'][0]
@@ -386,6 +395,8 @@ def reminder_node_4(data):
             position_id = '1'
         else:
             position_id = '3'
+        print('position_id: ', position_id)
+        print(thread_data)
 
         # Update kema_thread
         sql = '''
@@ -407,6 +418,7 @@ def reminder_node_4(data):
         # update_thread_position(trigger_message_sid, thread_id='1', position_id=position_id)
         msg = "Have you completed {} yet? 1 if YES, 2 if NO.".format(active_data['task'])
         send_msg(msg, user_phone, from_)
+        print('finished reminder_node_4')
 
 
 def create_reminder(data):
