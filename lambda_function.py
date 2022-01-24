@@ -6,7 +6,7 @@ import urllib
 from datetime import datetime
 
 from db import connect_to_rds, insert_into_table, select_from_table, clear_thread_for_user_phone
-from reminder import reminder_node_1, reminder_node_2, create_reminder, create_node_1, create_node_2, create_node_3, create_node_4, create_node_5
+from reminder import reminder_node_1, reminder_node_2, reminder_node_3, reminder_node_4, create_reminder, create_node_1, create_node_2, create_node_3, create_node_4, create_node_5
 from message import send_msg
 import conf
 
@@ -60,18 +60,24 @@ def lambda_inbound_message_handler(event, context):
     # If last conversation not ended
     print(trigger_message_sid, thread_id, position_id)
     if thread_id == '1':
-        # continue conversation
+        # Continue thread to send reminder
         if position_id == '1':
             # Ask barrier
             reminder_node_1(data) # Replace with API endpoint eventually
         elif position_id == '2':
-            # Update barrier
+            # Update barrier for single task
             reminder_node_2(data)
+        elif position_id == '3':
+            # Check status or ask barrier for multi-task
+            reminder_node_3(data)
+        elif position_id == '4':
+            # Update barrier for multiple task
+            reminder_node_4(data)
         else:
             raise ValueError('position_id {} does not exist'.format(position_id))
 
     elif thread_id == '0':
-        # Continue conversation
+        # Continue thread to create new reminder
         if position_id == '1':
             create_node_1(data) # Replace with API endpoint eventually
         elif position_id == '2':
@@ -134,7 +140,7 @@ event = {
     "user_phone": conf.twilio_num_to,
     "from_": conf.twilio_num_from_,
     "thread_id": "1",
-    "position_id": "1",
+    "position_id": "3",
     "response": "2"
     }
 }

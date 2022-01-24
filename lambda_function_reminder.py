@@ -30,23 +30,57 @@ def lambda_handler_send_reminder(event, context):
     try:
         sql = """
             SELECT DISTINCT
-                trigger_message_sid, user_phone, task, possibility, barrier, schedule_start, schedule_end, schedule_weekdays
+                trigger_message_sid, user_phone, task, possibility, barrier, schedule_start, schedule_end, schedule_weekdays,
+                COUNT(trigger_message_sid) OVER (PARTITION BY user_phone) AS num_task
             FROM
                 kema_schedule
             WHERE
-                CURRENT_DATE BETWEEN schedule_start AND schedule_end;
+                CURRENT_DATE BETWEEN schedule_start AND schedule_end
+            ORDER BY user_phone;
         """
+        sql = '''
+            with reminders AS (
+                SELECT
+                    user_phone,
+                    JSON_BUILD_OBJECT('trigger_message_sid', trigger_message_sid,
+                        'user_phone', user_phone,
+                        'task', task,
+                        'possibility', possibility,
+                        'barrier', barrier,
+                        'schedule_start', schedule_start,
+                        'schedule_end', schedule_end,
+                        'schedule_weekdays', schedule_weekdays
+                    ) AS reminder_object
+                FROM
+                    kema_schedule
+                WHERE
+                    CURRENT_DATE BETWEEN schedule_start AND schedule_end
+
+            )
+            SELECT
+                user_phone,
+                JSON_AGG(reminder_object)
+            FROM reminders
+            GROUP BY user_phone
+            ORDER BY user_phone;
+        '''
         reminders = select_from_table(sql)
     except:
         logger.error("ERROR: Unexpected error: Could not query data from RDS instance.")
         # logger.debug(data)
         sys.exit()
 
-    # For every item in list
     from_ = conf.twilio_num_from_
-    for (trigger_message_sid, to, task, possibility, barrier, schedule_start, schedule_end, schedule_weekdays) in reminders:
-        data = {'trigger_message_sid': trigger_message_sid, 'task':task.lower(), 'barrier':barrier.lower(), 'possibility': possibility.lower()}
-        send_reminder(to, from_, data=data)
+    # each user_phone:
+        # create a data obj by user_phone
+        # send reminder with data obj
+    for user_phone, reminder_objects in reminders:
+        data = {'user_phone': user_phone, 'tasks': reminder_objects}
+        send_reminder(user_phone, from_, data=data)
+        # data = [reminder_obj for reminder_obj in reminder_objects]
+    # for (trigger_message_sid, to, task, possibility, barrier, schedule_start, schedule_end, schedule_weekdays, num_task) in reminders:
+    #     data = {'trigger_message_sid': trigger_message_sid, 'task':task.lower(), 'barrier':barrier.lower(), 'possibility': possibility.lower()}
+    #     send_reminder(to, from_, data=data)
 
     return {
         'statusCode': 200,
@@ -149,3 +183,5 @@ def lambda_handler_update_db(event, context):
         'body': json.dumps('Hello from Lambda!'),
         'data': event
     }
+
+# lambda_handler_send_reminder(None, None)
