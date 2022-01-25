@@ -83,6 +83,9 @@ def send_reminder(to, from_, data={}):
         return
 
 def reminder_node_1(data):
+    '''Terminal node accepting accepting response from user on completion of tasks
+    Updates schedule or requests input on blocking emotions
+    '''
 
     # Read response
     current_date = datetime.now()
@@ -96,7 +99,6 @@ def reminder_node_1(data):
         # Update kema_schedule database to end schedule
         trigger_message_sid = data['trigger_message_sid']
 
-        print('trigger_message_sid reminder_node_1 ', trigger_message_sid)
         # Select past barrier
         sql = """
             SELECT DISTINCT
@@ -132,7 +134,6 @@ def reminder_node_1(data):
 
         # Update position in kema_thread db
         update_thread_position(trigger_message_sid, thread_id=thread_id, position_id=next_position_id, user_phone=user_phone)
-        print('updated thread position to ', thread_id, next_position_id)
         return
     else:
         msg = ''' Sorry I didn't understand that. '''
@@ -142,8 +143,7 @@ def reminder_node_1(data):
     update_thread_position(trigger_message_sid, clear_thread=True)
 
 def reminder_node_2(data):
-
-    print('start reminder_node_2')
+    '''Terminal node to add a new barrier'''
 
     current_date = datetime.now()
     trigger_message_sid = data['trigger_message_sid']
@@ -182,8 +182,6 @@ def reminder_node_2(data):
     msg = ''' Got it! I'll remember that for the future. These are are the things that you said have blocked you from completing this task before: {}. Just remember your possibility:  {}. You can do it!'''.format(prev_barrier, possibility)
     send_msg(msg, user_phone, from_)
 
-    print('finished reminder_node_2')
-
 
 def reminder_node_3(data):
     """  Multi-task version of reminder_node_1 """
@@ -207,7 +205,6 @@ def reminder_node_3(data):
             AND thread_id = %s;
         '''
     thread_data_extract = select_from_table(sql, (trigger_message_sid, user_phone, thread_id,))
-    print(thread_data_extract)
     (_, thread_data) = thread_data_extract[0]
     # thread_data: {'tasks': [{1, active}, {2, dormant}]}
 
@@ -297,9 +294,6 @@ def reminder_node_3(data):
         send_msg(msg, user_phone, from_)
         return
 
-
-    print('done with first text')
-    print(len(thread_data.get('tasks')))
     # Send status check for next task
     if len(thread_data.get('tasks')) > 1:
         thread_data['tasks'] = [thr_datum for thr_datum in thread_data['tasks'] if thr_datum['status'] != 'active']
@@ -388,11 +382,7 @@ def reminder_node_4(data):
 
 
     # Send status check for next task
-    print('tasks')
-    print(thread_data.get('tasks'))
     if len(thread_data.get('tasks')) > 1:
-        print('true')
-        print(thread_data)
         thread_data['tasks'] = [thr_datum for thr_datum in thread_data['tasks'] if thr_datum['status'] != 'active']
         thread_data['tasks'] = set_active_task(thread_data['tasks'])
         active_data = thread_data['tasks'][0]
@@ -402,8 +392,6 @@ def reminder_node_4(data):
             position_id = '1'
         else:
             position_id = '3'
-        print('position_id: ', position_id)
-        print(thread_data)
 
         # Update kema_thread
         sql = '''
@@ -419,13 +407,11 @@ def reminder_node_4(data):
             '''
 
         params = (new_trigger_message_sid, position_id, json.dumps(thread_data), current_date, trigger_message_sid, user_phone, thread_id,)
-        print(params)
         update_table(sql, params)
 
         # update_thread_position(trigger_message_sid, thread_id='1', position_id=position_id)
         msg = "Have you completed {} yet? 1 if YES, 2 if NO.".format(active_data['task'])
         send_msg(msg, user_phone, from_)
-        print('finished reminder_node_4')
 
 
 def create_reminder(data):
