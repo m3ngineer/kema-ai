@@ -96,15 +96,17 @@ def reminder_node_1(data):
         # Update kema_schedule database to end schedule
         trigger_message_sid = data['trigger_message_sid']
 
+        print('trigger_message_sid reminder_node_1 ', trigger_message_sid)
         # Select past barrier
         sql = """
             SELECT DISTINCT
-                trigger_message_sid, barrier, possibility, COUNT(trigger_message_sid) OVER (PARTITION BY user_phone) AS num_task,
+                trigger_message_sid, barrier, possibility, COUNT(trigger_message_sid) OVER (PARTITION BY user_phone) AS num_task
             FROM
                 kema_schedule
-            WHERE user_phone = %s;
+            WHERE user_phone = %s
+                AND trigger_message_sid = %s;
         """
-        prev_possibility = select_from_table(sql, (user_phone,))
+        prev_possibility = select_from_table(sql, (user_phone, trigger_message_sid,))
         (_, barrier, possibility, num_task) = prev_possibility[0]
 
         # Update schedule_start to the next week
@@ -271,7 +273,7 @@ def reminder_node_3(data):
             UPDATE kema_schedule
             SET schedule_start = %s,
                 update_datetime = %s
-            WHERE trigger_message_sid = %s
+            WHERE trigger_message_sid = %s;
             '''
 
         params = (strt_nxt_wk, current_date, trigger_message_sid,)
@@ -296,13 +298,18 @@ def reminder_node_3(data):
         return
 
 
+    print('done with first text')
+    print(len(thread_data.get('tasks')))
     # Send status check for next task
     if len(thread_data.get('tasks')) > 1:
-        thread_data['tasks'] = [thr_datum for thr_datum in thread_data if thr_datum['status'] != 'active']
+        thread_data['tasks'] = [thr_datum for thr_datum in thread_data['tasks'] if thr_datum['status'] != 'active']
         thread_data['tasks'] = set_active_task(thread_data['tasks'])
         active_data = thread_data['tasks'][0]
         new_trigger_message_sid = active_data['trigger_message_sid']
-        position_id = '3' # No need to change position_id
+        if len(thread_data['tasks']) == 1:
+            position_id = '1'
+        else:
+            position_id = '3'
 
         # Update kema_thread
         sql = '''
@@ -317,7 +324,7 @@ def reminder_node_3(data):
                 AND thread_id = %s;
             '''
 
-        params = (new_trigger_message_sid, position_id, thread_data, current_date, trigger_message_sid, user_phone, thread_id,)
+        params = (new_trigger_message_sid, position_id, json.dumps(thread_data), current_date, trigger_message_sid, user_phone, thread_id,)
         update_table(sql, params)
 
         # update_thread_position(trigger_message_sid, thread_id='1', position_id=position_id)
