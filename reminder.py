@@ -3,7 +3,8 @@ from twilio.rest import Client
 from datetime import datetime, timedelta
 
 from message import send_msg
-from db import update_table, select_from_table, insert_into_table, update_thread_position, clear_thread_for_user_phone
+from db import (update_table, select_from_table, insert_into_table,
+    update_thread_position, clear_thread_for_user_phone)
 import conf
 
 def execute_reminder_flow(to, from_, data={}):
@@ -79,7 +80,7 @@ def send_reminder(to, from_, data={}):
         insert_into_table(thread_data, 'kema_thread')
     else:
         # No data found
-        print('no tasks found')
+        print('No tasks found')
         return
 
 def reminder_node_1(data):
@@ -102,7 +103,10 @@ def reminder_node_1(data):
         # Select past barrier
         sql = """
             SELECT DISTINCT
-                trigger_message_sid, barrier, possibility, COUNT(trigger_message_sid) OVER (PARTITION BY user_phone) AS num_task
+                trigger_message_sid,
+                barrier,
+                possibility,
+                COUNT(trigger_message_sid) OVER (PARTITION BY user_phone) AS num_task
             FROM
                 kema_schedule
             WHERE user_phone = %s
@@ -206,54 +210,13 @@ def reminder_node_3(data):
         '''
     thread_data_extract = select_from_table(sql, (trigger_message_sid, user_phone, thread_id,))
     (_, thread_data) = thread_data_extract[0]
-    # thread_data: {'tasks': [{1, active}, {2, dormant}]}
-
-    # reminder_node_1:
-    # check for thread_data length:
-    # if more than 1 task:
-        # reminder_node_3
-        # if barrier --> reminder_node_4
-        # else --> reminder_node_3?
-    # else:
-        # if barrier --> reminder_node_2
-        # else --> finish
-
-    # reminder_node_3:
-    # check length of thread_data:
-    # if more than 1 task:
-        # check response:
-        # if response is completed:
-            # perform actions to complete response
-        # if response is not completed:
-            # request additional barrier
-            # set position for reminder_node_4
-
-        # set new active task
-        # set position_id to route to reminder_node_1
-        # update kema_thread to next trigger_message_sid
-        # update kema_thread with new thread_data and trigger_message_sid
-
-        # Send message asking for completion of next task
-
-    # if only 1 task remaining:
-        # if response is completed:
-
-        # else if response is not completed:
-            # request additional barrier
-            # reminder_node_2
-
 
     # Determine actions based on response
     if trigger_text == '1' or trigger_text.lower() in ('yes'):
-        # 1. Update kema_schedule database to end schedule
-            # set thread to 3
-        # 2. ask for barrier
-    # if >1 remaining tasks: remove active data from kema_thread, set next task as active
-    # if 1 remaining task: set position id = 2
         active_task_data = thread_data['tasks'][0] # TODO: set this to search for active task
 
         # Update kema_schedule database to end schedule
-        # Select past barrier
+        # Select task metadata
         sql = """
             SELECT DISTINCT
                 trigger_message_sid, barrier, possibility
@@ -326,8 +289,6 @@ def reminder_node_3(data):
         msg = "Have you completed {} yet? 1 if YES, 2 if NO.".format(active_data['task'])
         send_msg(msg, user_phone, from_)
 
-    # # Clear path
-    # update_thread_position(trigger_message_sid, clear_thread=True)
 
 def reminder_node_4(data):
     """  Multi-task version of reminder_node_2: append new barrier """
