@@ -570,6 +570,37 @@ def create_node_5(data):
     # Clear path
     update_thread_position(trigger_message_sid, clear_thread=True)
 
+def retrieve_reminders(data):
+    ''' Retrieve active tasks '''
+    pass
+
+def retrieve_menu(data):
+    ''' Retrieve menu of options '''
+    pass
+
+def delete_reminder(data):
+    ''' Deletes a reminder '''
+
+    current_date = datetime.now()
+    trigger_message_sid = data['trigger_message_sid']
+    trigger_text = data['trigger_text']
+    user_phone = data['user_phone']
+    from_ = conf.twilio_num_from_
+
+    # Retrive reminder list
+    msg = '''Hello! Today is going to be a  great one :) What's one thing that you have been putting off or want to accomplish?'''
+    send_msg(msg, user_phone, from_)
+
+    thread_data = {
+        'trigger_message_sid': trigger_message_sid,
+        'user_phone': user_phone,
+        'thread_id': '0',
+        'position_id': '1',
+        'thread_data': json.dumps({'trigger_text': trigger_text})
+    }
+
+    insert_into_table(thread_data, 'kema_thread')
+
 if __name__ == "__main__":
     to = conf.twilio_num_to
     from_ = conf.twilio_num_from_
