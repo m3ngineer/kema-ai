@@ -572,7 +572,41 @@ def create_node_5(data):
 
 def retrieve_reminders(data):
     ''' Retrieve active tasks '''
-    pass
+
+    trigger_message_sid = data['trigger_message_sid']
+    trigger_text = data['trigger_text']
+    user_phone = data['user_phone']
+    from_ = conf.twilio_num_from_
+    thread_id = '1'
+
+    # Extract task data
+    sql = '''
+        SELECT
+            trigger_message_sid,
+            task,
+            RANK() OVER (PARTITION BY user_phone ORDER BY update_datetime DESC) AS ordering
+        FROM
+            kema_schedule
+        WHERE
+            user_phone = %s
+            AND CURRENT_DATE BETWEEN schedule_start AND schedule_end
+        ORDER BY
+            ordering ASC
+        LIMIT 5;
+        '''
+    task_list = select_from_table(sql, (user_phone,))
+
+    # Send message with task list
+    task_str = '\n  '.join(['{}. {}'.format(task_num, task) for (msg_sid, task, task_num) in task_list])
+    msg = """
+    Here are your active tasks:\n
+    {}
+    \n0. NONE
+    """.format(task_str)
+    send_msg(msg, user_phone, from_)
+
+    return task_list
+
 
 def retrieve_menu(data):
     ''' Retrieve menu of options '''
@@ -581,28 +615,84 @@ def retrieve_menu(data):
 def delete_reminder(data):
     ''' Deletes a reminder '''
 
+    task_list = retrieve_reminders(data)
+
+    # Store data in thread
+    thread_data = {
+        'trigger_message_sid': trigger_message_sid,
+        'user_phone': user_phone,
+        'thread_id': '2',
+        'position_id': '1',
+        'thread_data': json.dumps({'task_list': task_list})
+    }
+
+    insert_into_table(thread_data, 'kema_thread')
+
+    msg = """Respond with the number of the task you would like to remove"""
+    send_msg(msg, user_phone, from_)
+
+def delete_reminder_node_1(data):
+    """Accept response for number of task to remove"""
+
     current_date = datetime.now()
     trigger_message_sid = data['trigger_message_sid']
     trigger_text = data['trigger_text']
     user_phone = data['user_phone']
     from_ = conf.twilio_num_from_
+    thread_id = '2'
 
-    # Retrive reminder list
-    msg = '''Hello! Today is going to be a  great one :) What's one thing that you have been putting off or want to accomplish?'''
-    send_msg(msg, user_phone, from_)
+    if trigger_text.strip() == '0':
+        # User exits delete thread
+        return
 
-    thread_data = {
-        'trigger_message_sid': trigger_message_sid,
-        'user_phone': user_phone,
-        'thread_id': '0',
-        'position_id': '1',
-        'thread_data': json.dumps({'trigger_text': trigger_text})
-    }
+    # Extract trigger text and match task number to delete
+    sql = '''
+        SELECT
+            trigger_message_sid,
+            thread_data
+        FROM
+            kema_thread
+        WHERE
+            trigger_message_sid = %s
+            AND user_phone = %s
+            AND thread_id = %s;
+        '''
+    thread_data = select_from_table(sql, (trigger_message_sid, user_phone, thread_id,))
+    print(thread_data)
+    (_, task_list) = thread_data[0]
 
-    insert_into_table(thread_data, 'kema_thread')
+    task_to_delete = None
+    for (msg_sid, task, task_num) in task_list:
+        if task_num == trigger_text.strip():
+            task_to_delete = msg_sid
+
+    if task_to_delete:
+        # Delete task
+        sql = '''
+            DELETE
+            FROM
+                kema_schedule
+            WHERE
+                trigger_message_sid = %s
+                AND user_phone = %s;
+            '''
+        update_table(sql, (trigger_message_sid, user_phone,))
+
+        # Send confirmation text
+        msg = """Ok deleted task {}""".format(task_to_delete)
+        send_msg(msg, user_phone, from_)
+    else:
+        msg = """Ok no tasks were deleted"""
+        send_msg(msg, user_phone, from_)
+
+    # Clear thread
+    update_thread_position(trigger_message_sid, clear_thread=True)
 
 if __name__ == "__main__":
     to = conf.twilio_num_to
     from_ = conf.twilio_num_from_
-    data = [{'trigger_message_sid': 'test', 'user_phone': '+19148198579', 'task': 'test', 'possibility': 'test', 'barrier': 'test,2,2,2,Time,Time,Time,Time', 'schedule_start': '2022-01-16', 'schedule_end': '2022-03-01', 'schedule_weekdays': '0,1,2,3,4,5,6'}, {'trigger_message_sid': 'SMa126b917d45093ebea2189025edfc8db', 'user_phone': '+19148198579', 'task': 'Writing a health Econ article', 'possibility': 'Becoming a health tech company revolutionary', 'barrier': 'Perfection,Time,Not enough time,Time to do it,Doing too much,Not setting a schedule', 'schedule_start': '2022-01-11', 'schedule_end': '2022-01-31', 'schedule_weekdays': '0,1,2,3,4,5,6'}]
-    send_reminder(to, from_, data=data)
+    data = [{'trigger_message_sid': 'test', 'trigger_text': 'list tasks', 'user_phone': '+19148198579', 'task': 'test', 'possibility': 'test', 'barrier': 'test,2,2,2,Time,Time,Time,Time', 'schedule_start': '2022-01-16', 'schedule_end': '2022-03-01', 'schedule_weekdays': '0,1,2,3,4,5,6'}, {'trigger_message_sid': 'SMa126b917d45093ebea2189025edfc8db', 'user_phone': '+19148198579', 'task': 'Writing a health Econ article', 'possibility': 'Becoming a health tech company revolutionary', 'barrier': 'Perfection,Time,Not enough time,Time to do it,Doing too much,Not setting a schedule', 'schedule_start': '2022-01-11', 'schedule_end': '2022-01-31', 'schedule_weekdays': '0,1,2,3,4,5,6'}]
+    data = {'user_phone': '+19148198579', 'trigger_text': 'list tasks', 'trigger_message_sid': 'test'}
+    # send_reminder(to, from_, data=data)
+
+    retrieve_reminders(data)

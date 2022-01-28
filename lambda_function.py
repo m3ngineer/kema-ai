@@ -6,7 +6,9 @@ import urllib
 from datetime import datetime
 
 from db import connect_to_rds, insert_into_table, select_from_table, clear_thread_for_user_phone
-from reminder import reminder_node_1, reminder_node_2, reminder_node_3, reminder_node_4, create_reminder, create_node_1, create_node_2, create_node_3, create_node_4, create_node_5
+from reminder import (reminder_node_1, reminder_node_2, reminder_node_3,
+    reminder_node_4, create_reminder, create_node_1, create_node_2,
+    create_node_3, create_node_4, create_node_5, delete_reminder_node_1)
 from message import send_msg
 import conf
 
@@ -74,7 +76,7 @@ def lambda_inbound_message_handler(event, context):
             # Update barrier for multiple task
             reminder_node_4(data)
         else:
-            raise ValueError('position_id {} does not exist'.format(position_id))
+            raise ValueError('position_id {} does not exist for thread_id {}'.format(position_id, thread_id))
 
     elif thread_id == '0':
         # Continue thread to create new reminder
@@ -89,7 +91,14 @@ def lambda_inbound_message_handler(event, context):
         elif position_id == '5':
             create_node_5(data)
         else:
-            raise ValueError('position_id {} does not exist'.format(position_id))
+            raise ValueError('position_id {} does not exist for thread_id {}'.format(position_id, thread_id))
+
+    elif thread_id == '2':
+        # Continue thread to create new reminder
+        if position_id == '1':
+            delete_reminder_node_1(data) # Replace with API endpoint eventually
+        else:
+            raise ValueError('position_id {} does not exist for thread_id {}'.format(position_id, thread_id))
 
     # Else start new task
     else:
