@@ -599,9 +599,7 @@ def retrieve_reminders(data):
     # Send message with task list
     task_str = '\n  '.join(['{}. {}'.format(task_num, task) for (msg_sid, task, task_num) in task_list])
     msg = """
-    Here are your active tasks:\n
-    {}
-    \n0. NONE
+    Here are your active tasks:\n{}\n0. NONE
     """.format(task_str)
     send_msg(msg, user_phone, from_)
 
@@ -614,6 +612,10 @@ def retrieve_menu(data):
 
 def delete_reminder(data):
     ''' Deletes a reminder '''
+
+    user_phone = data['user_phone']
+    trigger_message_sid = data['trigger_message_sid']
+    from_ = conf.twilio_num_from_
 
     task_list = retrieve_reminders(data)
 
@@ -662,16 +664,17 @@ def delete_reminder_node_1(data):
     (_, task_list) = thread_data[0]
 
     task_to_delete = None
-    for (msg_sid, task, task_num) in task_list:
-        if task_num == trigger_text.strip():
+    for (msg_sid, task, task_num) in task_list['task_list']:
+        if str(task_num) == trigger_text.strip():
             task_to_delete = msg_sid
 
     if task_to_delete:
         # Delete task
         sql = '''
-            DELETE
-            FROM
+            UPDATE
                 kema_schedule
+            SET
+                schedule_end = schedule_start - INTERVAL '1 DAY'
             WHERE
                 trigger_message_sid = %s
                 AND user_phone = %s;
