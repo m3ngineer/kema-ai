@@ -8,7 +8,8 @@ from datetime import datetime
 from db import connect_to_rds, insert_into_table, select_from_table, clear_thread_for_user_phone
 from reminder import (reminder_node_1, reminder_node_2, reminder_node_3,
     reminder_node_4, create_reminder, create_node_1, create_node_2,
-    create_node_3, create_node_4, create_node_5, delete_reminder, delete_reminder_node_1)
+    create_node_3, create_node_4, create_node_5, delete_reminder, delete_reminder_node_1,
+    retrieve_menu)
 from message import send_msg
 import conf
 
@@ -62,6 +63,11 @@ def lambda_inbound_message_handler(event, context):
     # Tigger thread to delete task
     if 'delete' in data['trigger_text'].lower() or 'delete task' in data['trigger_text'].lower():
         delete_reminder(data)
+        return
+
+    # Tigger thread to delete task
+    if 'menu' in data['trigger_text'].lower() or 'option' in data['trigger_text'].lower():
+        retrieve_menu(data)
         return
 
     # If last conversation not ended

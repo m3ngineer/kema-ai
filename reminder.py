@@ -608,7 +608,13 @@ def retrieve_reminders(data):
 
 def retrieve_menu(data):
     ''' Retrieve menu of options '''
-    pass
+
+    user_phone = data['user_phone']
+    trigger_message_sid = data['trigger_message_sid']
+    from_ = conf.twilio_num_from_
+
+    msg = """Menu\n1.MENU to see options\n2.CREATE to start a new task\n3.DELETE to remove a task\n4.EXIT to restart conversation"""
+    send_msg(msg, user_phone, from_)
 
 def delete_reminder(data):
     ''' Deletes a reminder '''
@@ -660,7 +666,6 @@ def delete_reminder_node_1(data):
             AND thread_id = %s;
         '''
     thread_data = select_from_table(sql, (trigger_message_sid, user_phone, thread_id,))
-    print(thread_data)
     (_, task_list) = thread_data[0]
 
     task_to_delete = None
@@ -682,7 +687,7 @@ def delete_reminder_node_1(data):
         update_table(sql, (trigger_message_sid, user_phone,))
 
         # Send confirmation text
-        msg = """Ok deleted task {}""".format(task_to_delete)
+        msg = """The task {} has been deleted""".format(task_to_delete)
         send_msg(msg, user_phone, from_)
     else:
         msg = """Ok no tasks were deleted"""
