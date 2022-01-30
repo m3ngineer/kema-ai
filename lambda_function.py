@@ -7,7 +7,7 @@ from datetime import datetime
 
 from db import connect_to_rds, insert_into_table, select_from_table, clear_thread_for_user_phone
 from reminder import (reminder_node_1, reminder_node_2, reminder_node_3,
-    reminder_node_4, create_reminder, create_node_1, create_node_2,
+    reminder_node_4, reminder_node_5, create_reminder, create_node_1, create_node_2,
     create_node_3, create_node_4, create_node_5, delete_reminder, delete_reminder_node_1,
     retrieve_menu)
 from message import send_msg
@@ -86,6 +86,9 @@ def lambda_inbound_message_handler(event, context):
         elif position_id == '4':
             # Update barrier for multiple task
             reminder_node_4(data)
+        elif position_id == '5':
+            # End or update schedule for completed tasks
+            reminder_node_5(data)
         else:
             raise ValueError('position_id {} does not exist for thread_id {}'.format(position_id, thread_id))
 

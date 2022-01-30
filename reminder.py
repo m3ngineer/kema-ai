@@ -127,8 +127,14 @@ def reminder_node_1(data):
         params = (strt_nxt_wk, current_date, trigger_message_sid,)
         update_table(sql, params)
 
-        msg = '''That's great! You're that much closer to the goal you set of: {}. You can do it!'''.format(possibility)
+        msg = '''That's great! You're that much closer to the goal you set of: {}. Would you like me to end this reminder permanently or start again next week?\n1. End permanently\n2.Restart for next week'''.format(possibility)
         send_msg(msg, user_phone, from_)
+
+        # Update position in kema_thread db
+        thread_id = '1'
+        next_position_id = '5'
+        update_thread_position(trigger_message_sid, thread_id=thread_id, position_id=next_position_id, user_phone=user_phone)
+        return
 
     elif trigger_text == '2' or trigger_text.lower() in ('no'):
         msg = '''What is keeping you from completing this task?'''
@@ -374,6 +380,76 @@ def reminder_node_4(data):
         msg = "Have you completed {} yet? 1 if YES, 2 if NO.".format(active_data['task'])
         send_msg(msg, user_phone, from_)
 
+
+def reminder_node_5(data):
+    '''Terminal node accepting accepting response from user on completion of tasks
+    Updates schedule or requests input on blocking emotions
+    '''
+
+    # Read response
+    current_date = datetime.now()
+    trigger_message_sid = data['trigger_message_sid']
+    trigger_text = data['trigger_text']
+    user_phone = data['user_phone']
+    from_ = conf.twilio_num_from_
+
+    # Determine actions based on response
+    if trigger_text == '1' or trigger_text.lower() in ('yes') or trigger_text == '2' or trigger_text.lower() in ('no'):
+        # Update kema_schedule database to delay schedule
+        trigger_message_sid = data['trigger_message_sid']
+
+        # Select past barrier
+        sql = """
+            SELECT DISTINCT
+                trigger_message_sid,
+                barrier,
+                possibility,
+                COUNT(trigger_message_sid) OVER (PARTITION BY user_phone) AS num_task
+            FROM
+                kema_schedule
+            WHERE user_phone = %s
+                AND trigger_message_sid = %s;
+        """
+        prev_possibility = select_from_table(sql, (user_phone, trigger_message_sid,))
+        (_, barrier, possibility, num_task) = prev_possibility[0]
+
+        if trigger_text == '1' or trigger_text.lower() in ('yes'):
+            # Update schedule_start to the next week
+            strt_nxt_wk = current_date + timedelta(7) - timedelta(days=current_date.isoweekday() % 7)
+            sql = '''
+                UPDATE kema_schedule
+                SET schedule_start = %s,
+                    update_datetime = %s
+                WHERE trigger_message_sid = %s
+                '''
+
+            params = (strt_nxt_wk, current_date, trigger_message_sid,)
+            update_table(sql, params)
+
+            msg = '''That's great! I'll remind you next week. You're that much closer to the goal you set of: {}. You can do it!'''.format(possibility)
+            send_msg(msg, user_phone, from_)
+
+        elif trigger_text == '2' or trigger_text.lower() in ('no'):
+            # End schedule permanently
+            sql = '''
+                UPDATE kema_schedule
+                SET schedule_end = schedule_start - INTERVAL '1 DAY',
+                    update_datetime = %s
+                WHERE trigger_message_sid = %s
+                '''
+
+            params = (strt_nxt_wk, current_date, trigger_message_sid,)
+            update_table(sql, params)
+
+            msg = '''That's great! You're that much closer to the goal you set of: {}. You can do it!'''.format(possibility)
+            send_msg(msg, user_phone, from_)
+
+    else:
+        msg = ''' Sorry I didn't understand that. '''
+        send_msg(msg, user_phone, from_)
+
+    # Clear path
+    update_thread_position(trigger_message_sid, clear_thread=True)
 
 def create_reminder(data):
     ''' Thread for setting up a new reminder '''
