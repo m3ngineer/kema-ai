@@ -438,7 +438,7 @@ def reminder_node_5(data):
                 WHERE trigger_message_sid = %s
                 '''
 
-            params = (strt_nxt_wk, current_date, trigger_message_sid,)
+            params = (current_date, trigger_message_sid,)
             update_table(sql, params)
 
             msg = '''That's great! You're that much closer to the goal you set of: {}. You can do it!'''.format(possibility)
