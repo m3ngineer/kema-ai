@@ -115,18 +115,6 @@ def reminder_node_1(data):
         prev_possibility = select_from_table(sql, (user_phone, trigger_message_sid,))
         (_, barrier, possibility, num_task) = prev_possibility[0]
 
-        # Update schedule_start to the next week
-        strt_nxt_wk = current_date + timedelta(7) - timedelta(days=current_date.isoweekday() % 7)
-        sql = '''
-            UPDATE kema_schedule
-            SET schedule_start = %s,
-                update_datetime = %s
-            WHERE trigger_message_sid = %s
-            '''
-
-        params = (strt_nxt_wk, current_date, trigger_message_sid,)
-        update_table(sql, params)
-
         msg = '''That's great! You're that much closer to the goal you set of: {}. Would you like me to end this reminder permanently or start again next week?\n1. End permanently\n2.Restart for next week'''.format(possibility)
         send_msg(msg, user_phone, from_)
 
