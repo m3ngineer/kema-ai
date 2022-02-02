@@ -209,32 +209,61 @@ def reminder_node_3(data):
     if trigger_text == '1' or trigger_text.lower() in ('yes'):
         active_task_data = thread_data['tasks'][0] # TODO: set this to search for active task
 
-        # Update kema_schedule database to end schedule
-        # Select task metadata
+
+        # This is NEW ----
+        # Select past barrier
         sql = """
             SELECT DISTINCT
-                trigger_message_sid, barrier, possibility
+                trigger_message_sid,
+                barrier,
+                possibility,
+                COUNT(trigger_message_sid) OVER (PARTITION BY user_phone) AS num_task
             FROM
                 kema_schedule
-            WHERE user_phone = %s;
+            WHERE user_phone = %s
+                AND trigger_message_sid = %s;
         """
-        prev_possibility = select_from_table(sql, (user_phone,))
-        (_, barrier, possibility) = prev_possibility[0]
+        prev_possibility = select_from_table(sql, (user_phone, trigger_message_sid,))
+        (_, barrier, possibility, num_task) = prev_possibility[0]
 
-        # Update schedule_start to the next week
-        strt_nxt_wk = current_date + timedelta(7) - timedelta(days=current_date.isoweekday() % 7)
-        sql = '''
-            UPDATE kema_schedule
-            SET schedule_start = %s,
-                update_datetime = %s
-            WHERE trigger_message_sid = %s;
-            '''
-
-        params = (strt_nxt_wk, current_date, trigger_message_sid,)
-        update_table(sql, params)
-
-        msg = '''That's great! You're that much closer to the goal you set of: {}. You can do it!'''.format(possibility)
+        msg = '''That's great! You're that much closer to the goal you set of: {}. Would you like me to end this reminder permanently or start again next week?\n1. End permanently\n2.Restart for next week'''.format(possibility)
         send_msg(msg, user_phone, from_)
+
+        # Update position in kema_thread db
+        thread_id = '1'
+        next_position_id = '6'
+        update_thread_position(trigger_message_sid, thread_id=thread_id, position_id=next_position_id, user_phone=user_phone)
+        return
+
+        # END This is NEW ----
+
+
+        # # Update kema_schedule database to end schedule
+        # # Select task metadata
+        # sql = """
+        #     SELECT DISTINCT
+        #         trigger_message_sid, barrier, possibility
+        #     FROM
+        #         kema_schedule
+        #     WHERE user_phone = %s;
+        # """
+        # prev_possibility = select_from_table(sql, (user_phone,))
+        # (_, barrier, possibility) = prev_possibility[0]
+        #
+        # # Update schedule_start to the next week
+        # strt_nxt_wk = current_date + timedelta(7) - timedelta(days=current_date.isoweekday() % 7)
+        # sql = '''
+        #     UPDATE kema_schedule
+        #     SET schedule_start = %s,
+        #         update_datetime = %s
+        #     WHERE trigger_message_sid = %s;
+        #     '''
+        #
+        # params = (strt_nxt_wk, current_date, trigger_message_sid,)
+        # update_table(sql, params)
+        #
+        # msg = '''That's great! You're that much closer to the goal you set of: {}. You can do it!'''.format(possibility)
+        # send_msg(msg, user_phone, from_)
 
     elif trigger_text == '2' or trigger_text.lower() in ('no'):
         msg = '''What is keeping you from completing this task?'''
@@ -250,38 +279,6 @@ def reminder_node_3(data):
         msg = ''' Sorry I didn't understand that. '''
         send_msg(msg, user_phone, from_)
         return
-
-    # Send status check for next task
-    if len(thread_data.get('tasks')) > 1:
-        thread_data['tasks'] = [thr_datum for thr_datum in thread_data['tasks'] if thr_datum['status'] != 'active']
-        thread_data['tasks'] = set_active_task(thread_data['tasks'])
-        active_data = thread_data['tasks'][0]
-        new_trigger_message_sid = active_data['trigger_message_sid']
-        if len(thread_data['tasks']) == 1:
-            position_id = '1'
-        else:
-            position_id = '3'
-
-        # Update kema_thread
-        sql = '''
-            UPDATE kema_thread
-            SET
-                trigger_message_sid = %s,
-                position_id = %s,
-                thread_data = %s,
-                update_datetime = %s
-            WHERE trigger_message_sid = %s
-                AND user_phone = %s
-                AND thread_id = %s;
-            '''
-
-        params = (new_trigger_message_sid, position_id, json.dumps(thread_data), current_date, trigger_message_sid, user_phone, thread_id,)
-        update_table(sql, params)
-
-        # update_thread_position(trigger_message_sid, thread_id='1', position_id=position_id)
-
-        msg = "Have you completed {} yet? 1 if YES, 2 if NO.".format(active_data['task'])
-        send_msg(msg, user_phone, from_)
 
 
 def reminder_node_4(data):
@@ -438,6 +435,43 @@ def reminder_node_5(data):
 
     # Clear path
     update_thread_position(trigger_message_sid, clear_thread=True)
+
+
+def reminder_node_6(data):
+
+
+
+    # Send status check for next task
+    if len(thread_data.get('tasks')) > 1:
+        thread_data['tasks'] = [thr_datum for thr_datum in thread_data['tasks'] if thr_datum['status'] != 'active']
+        thread_data['tasks'] = set_active_task(thread_data['tasks'])
+        active_data = thread_data['tasks'][0]
+        new_trigger_message_sid = active_data['trigger_message_sid']
+        if len(thread_data['tasks']) == 1:
+            position_id = '1'
+        else:
+            position_id = '3'
+
+        # Update kema_thread
+        sql = '''
+            UPDATE kema_thread
+            SET
+                trigger_message_sid = %s,
+                position_id = %s,
+                thread_data = %s,
+                update_datetime = %s
+            WHERE trigger_message_sid = %s
+                AND user_phone = %s
+                AND thread_id = %s;
+            '''
+
+        params = (new_trigger_message_sid, position_id, json.dumps(thread_data), current_date, trigger_message_sid, user_phone, thread_id,)
+        update_table(sql, params)
+
+        # update_thread_position(trigger_message_sid, thread_id='1', position_id=position_id)
+
+        msg = "Have you completed {} yet? 1 if YES, 2 if NO.".format(active_data['task'])
+        send_msg(msg, user_phone, from_)
 
 def create_reminder(data):
     ''' Thread for setting up a new reminder '''
