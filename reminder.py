@@ -438,7 +438,70 @@ def reminder_node_5(data):
 
 
 def reminder_node_6(data):
+    '''
+    Node accepting response from user on whether to end or update schedule
+    for multi-task thread
+    '''
 
+    # Read response
+    current_date = datetime.now()
+    trigger_message_sid = data['trigger_message_sid']
+    trigger_text = data['trigger_text']
+    user_phone = data['user_phone']
+    from_ = conf.twilio_num_from_
+    thread_id = '1'
+
+    # Extract thread_data from kema_thread
+    sql = '''
+        SELECT trigger_message_sid, thread_data FROM kema_thread
+        WHERE
+            trigger_message_sid = %s
+            AND user_phone = %s
+            AND thread_id = %s;
+        '''
+    thread_data_extract = select_from_table(sql, (trigger_message_sid, user_phone, thread_id,))
+    (_, thread_data) = thread_data_extract[0]
+
+    # Get active_task
+    active_task = [thr_datum for thr_datum in thread_data['tasks'] if thr_datum['status'] != 'active'][0]
+
+    if trigger_text == '1':
+        # End task
+        sql = '''
+            UPDATE kema_schedule
+            SET schedule_end = schedule_start - INTERVAL 1 DAY,
+                update_datetime = %s
+            WHERE trigger_message_sid = %s;
+            '''
+
+        params = (strt_nxt_wk, current_date, trigger_message_sid,)
+        update_table(sql, params)
+
+        msg = '''Ok I've ended reminders for this task.'''
+        send_msg(msg, user_phone, from_)
+
+    elif trigger_text == '2':
+        # Update schedule_start to the next week
+        strt_nxt_wk = current_date + timedelta(7) - timedelta(days=current_date.isoweekday() % 7)
+        sql = '''
+            UPDATE kema_schedule
+            SET schedule_start = %s,
+                update_datetime = %s
+            WHERE trigger_message_sid = %s;
+            '''
+
+        params = (strt_nxt_wk, current_date, trigger_message_sid,)
+        update_table(sql, params)
+
+        msg = '''Ok I've updated the schedule to start next week for this task.'''
+        send_msg(msg, user_phone, from_)
+    else:
+        msg = ''' Sorry I didn't understand that. '''
+        send_msg(msg, user_phone, from_)
+
+        # Clear path
+        update_thread_position(trigger_message_sid, clear_thread=True)
+        return
 
 
     # Send status check for next task
