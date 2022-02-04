@@ -55,20 +55,26 @@ def lambda_inbound_message_handler(event, context):
         # Clear any other threads
         clear_thread_for_user_phone(user_phone, exclude_trigger_message_sid=trigger_message_sid)
 
-    # Check for STOP request and exist all threads if found
+    # Check for STOP request and exit all threads if found
     if data['trigger_text'].lower() in ('stop', 'exit'):
         clear_thread_for_user_phone(user_phone)
         send_msg('Ok, restarting all conversations.', conf.twilio_num_to, conf.twilio_num_from_)
         return
 
-    # Tigger thread to delete task
+    # Trigger thread to delete task
     if 'delete' in data['trigger_text'].lower() or 'delete task' in data['trigger_text'].lower():
         delete_reminder(data)
         return
 
-    # Tigger thread to delete task
+    # Go to Menu
     if 'menu' in data['trigger_text'].lower() or 'option' in data['trigger_text'].lower():
         retrieve_menu(data)
+        return
+
+    # Check for CREATE request and exit all threads if found
+    if data['trigger_text'].lower() in ('create','new','new task','create task','start new','start task'):
+        clear_thread_for_user_phone(user_phone)
+        create_reminder(data)
         return
 
     # If last conversation not ended
