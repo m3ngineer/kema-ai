@@ -310,10 +310,11 @@ def reminder_node_4(data):
         FROM
             kema_schedule
         WHERE user_phone = %s
+            AND trigger_message_sid = %s;
     """
 
      # need to specify trigger_message_sid here?
-    prev_barriers = select_from_table(sql, (user_phone,))
+    prev_barriers = select_from_table(sql, (user_phone,trigger_message_sid,))
     (trigger_message_sid, prev_barrier, possibility) = prev_barriers[0]
 
     # Update kema_schedule
@@ -340,6 +341,7 @@ def reminder_node_4(data):
         active_data = thread_data['tasks'][0]
         new_trigger_message_sid = active_data['trigger_message_sid']
 
+        print(thread_data['tasks'])
         if len(thread_data['tasks']) == 1:
             position_id = '1'
         else:
@@ -364,6 +366,8 @@ def reminder_node_4(data):
         # update_thread_position(trigger_message_sid, thread_id='1', position_id=position_id)
         msg = "Have you completed {} yet? 1 if YES, 2 if NO.".format(active_data['task'])
         send_msg(msg, user_phone, from_)
+    else:
+        raise ValueError('This scenario has not been built yet.')
 
 
 def reminder_node_5(data):
