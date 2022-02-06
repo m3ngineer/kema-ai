@@ -72,6 +72,21 @@ class ReminderSession():
         (trigger_message_sid, thread_data) = thread_data_extract[0]
         return (trigger_message_sid, thread_data)
 
+    def set_table_values(table, param_dict, trigger_message_sid=None, user_phone=None):
+        '''param_dict: dictionary of col:value pairs to be updated'''
+
+        current_date = datetime.now()
+
+        # Construct SQL query
+        updt_clause = '''UPDATE %s '''
+        set_clause = ' SET ' + ' '.join(['{} = %s'.format(col) for col,val in param_dict.items()]) + ' update_datetime = %s '
+        where_clause = ''' WHERE trigger_message_sid = %s AND user_phone = %s;'''
+        sql = updt_clause + set_clause + where_clause
+
+        # Construct tuple of parameters
+        params = tuple(table_name) + tuple(param_dict.values()) + tuple(current_date, self.trigger_message_sid, self.user_phone)
+        update_table(sql, params)
+
     def get_active_task(self):
         pass
 
@@ -206,18 +221,10 @@ def reminder_node_2(data):
     # Select past barrier
     prev_barrier, possibility = reminder.extract_past_barrier()
 
-    # Update kema_schedule
+    # Update kema_schedule with new barrier
     updt_barriers = ','.join([prev_barrier,new_barrier])
+    reminder.set_table_values('kema_schedule', {'barrier':updt_barriers})
 
-    sql = '''
-        UPDATE kema_schedule
-        SET barrier = %s,
-            update_datetime = %s
-        WHERE trigger_message_sid = %s;
-        '''
-
-    params = (updt_barriers, current_date, reminder.trigger_message_sid,)
-    update_table(sql, params)
 
     # Clear path
     update_thread_position(trigger_message_sid, clear_thread=True)
@@ -288,15 +295,9 @@ def reminder_node_4(data):
     msg = '''That's great! You're that much closer to the goal you set of: {}. Would you like me to end this reminder permanently or start again next week?\n1. End permanently\n2.Restart for next week'''.format(possibility)
     reminder.send_msg(msg)
 
-    # Update kema_schedule
+    # Update kema_schedule with new barrier
     updt_barriers = ','.join([prev_barrier,new_barrier])
-
-    sql = '''
-        UPDATE kema_schedule
-        SET barrier = %s,
-            update_datetime = %s
-        WHERE trigger_message_sid = %s;
-        '''
+    reminder.set_table_values('kema_schedule', {'barrier':updt_barriers})
 
     params = (updt_barriers, current_date, reminder.trigger_message_sid,)
     update_table(sql, params)
@@ -318,20 +319,13 @@ def reminder_node_4(data):
             position_id = '3'
 
         # Update kema_thread
-        sql = '''
-            UPDATE kema_thread
-            SET
-                trigger_message_sid = %s,
-                position_id = %s,
-                thread_data = %s,
-                update_datetime = %s
-            WHERE trigger_message_sid = %s
-                AND user_phone = %s
-                AND thread_id = %s;
-            '''
-
-        params = (new_trigger_message_sid, position_id, json.dumps(thread_data), current_date, reminder.trigger_message_sid, reminder.user_phone, thread_id,)
-        update_table(sql, params)
+        param_dict = {
+            'trigger_message_sid': new_trigger_message_sid,
+            'position_id': position_id,
+            'thread_data': json.dumps(thread_data),
+        }
+        # Need to set thread_id in WHERE clause?
+        reminder.set_table_values('kema_thread', param_dict)
 
         msg = "Have you completed {} yet? 1 if YES, 2 if NO.".format(active_data['task'])
         reminder.send_msg(msg)
@@ -460,20 +454,13 @@ def reminder_node_6(data):
             position_id = '3'
 
         # Update kema_thread
-        sql = '''
-            UPDATE kema_thread
-            SET
-                trigger_message_sid = %s,
-                position_id = %s,
-                thread_data = %s,
-                update_datetime = %s
-            WHERE trigger_message_sid = %s
-                AND user_phone = %s
-                AND thread_id = %s;
-            '''
-
-        params = (new_trigger_message_sid, position_id, json.dumps(thread_data), current_date, reminder.trigger_message_sid, reminder.user_phone, thread_id,)
-        update_table(sql, params)
+        param_dict = {
+            'trigger_message_sid': new_trigger_message_sid,
+            'position_id': position_id,
+            'thread_data': json.dumps(thread_data),
+        }
+        # Need to set thread_id in WHERE clause?
+        reminder.set_table_values('kema_thread', param_dict)
 
         msg = "Have you completed {} yet? 1 if YES, 2 if NO.".format(active_data['task'])
         reminder.send_msg(msg)
