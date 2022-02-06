@@ -45,8 +45,32 @@ class ReminderSession():
 
         return (barrier, possibility)
 
-    def extract_thread_data(self):
-        pass
+    def extract_thread_data(self, trigger_message_sid=None, user_phone=None, thread_id=None):
+
+        if not trigger_message_sid:
+            trigger_message_sid = self.trigger_message_sid
+        if not user_phone:
+            user_phone = self.user_phone
+
+        sql = '''
+            SELECT
+                trigger_message_sid,
+                thread_data
+            FROM
+                kema_thread
+            WHERE
+                trigger_message_sid = %s
+                AND user_phone = %s
+            '''
+        if thread_id:
+            sql = sql + ''' AND thread_id = %s;'''
+        else:
+            sql = sql + ''' AND thread_id = '1';'''
+            thread_id = '1'
+
+        thread_data_extract = select_from_table(sql, (self.trigger_message_sid, self.user_phone, thread_id,))
+        (trigger_message_sid, thread_data) = thread_data_extract[0]
+        return (trigger_message_sid, thread_data)
 
     def get_active_task(self):
         pass
@@ -158,7 +182,7 @@ def reminder_node_1(data):
 
     elif trigger_text == '2' or trigger_text.lower() in ('no'):
         msg = '''What is keeping you from completing this task?'''
-        send_msg(msg, user_phone, from_)
+        reminder.send_msg(msg)
         thread_id = '1'
         next_position_id = '2'
 
@@ -167,7 +191,7 @@ def reminder_node_1(data):
         return
     else:
         msg = ''' Sorry I didn't understand that. '''
-        send_msg(msg, user_phone, from_)
+        reminder.send_msg(msg)
 
     # Clear path
     update_thread_position(trigger_message_sid, clear_thread=True)
@@ -212,15 +236,7 @@ def reminder_node_3(data):
     thread_id = '1'
 
     # Extract thread_data from kema_thread
-    sql = '''
-        SELECT trigger_message_sid, thread_data FROM kema_thread
-        WHERE
-            trigger_message_sid = %s
-            AND user_phone = %s
-            AND thread_id = %s;
-        '''
-    thread_data_extract = select_from_table(sql, (reminder.trigger_message_sid, reminder.user_phone, thread_id,))
-    (_, thread_data) = thread_data_extract[0]
+    _, thread_data = reminder.extract_thread_data(thread_id=thread_id)
 
     # Determine actions based on response
     if trigger_text == '1' or trigger_text.lower() in ('yes'):
@@ -264,15 +280,7 @@ def reminder_node_4(data):
     thread_id = '1'
 
     # Extract thread_data from kema_thread
-    sql = '''
-        SELECT trigger_message_sid, thread_data FROM kema_thread
-        WHERE
-            trigger_message_sid = %s
-            AND user_phone = %s
-            AND thread_id = %s;
-        '''
-    thread_data_extract = select_from_table(sql, (trigger_message_sid, user_phone, thread_id,))
-    (_, thread_data) = thread_data_extract[0]
+    _, thread_data = reminder.extract_thread_data(thread_id=thread_id)
 
     # Select past barrier
     prev_barrier, possibility = reminder.extract_past_barrier()
@@ -400,18 +408,7 @@ def reminder_node_6(data):
     thread_id = '1'
 
     # Extract thread_data from kema_thread
-    sql = '''
-        SELECT trigger_message_sid, thread_data FROM kema_thread
-        WHERE
-            trigger_message_sid = %s
-            AND user_phone = %s
-            AND thread_id = %s;
-        '''
-    thread_data_extract = select_from_table(sql, (reminder.trigger_message_sid, reminder.user_phone, thread_id,))
-    (_, thread_data) = thread_data_extract[0]
-
-    # Get active_task
-    active_task = [thr_datum for thr_datum in thread_data['tasks'] if thr_datum['status'] != 'active'][0]
+    _, thread_data = reminder.extract_thread_data(thread_id=thread_id)
 
     if trigger_text == '1':
         # End task
@@ -451,7 +448,6 @@ def reminder_node_6(data):
         update_thread_position(reminder.trigger_message_sid, clear_thread=True)
         return
 
-
     # Send status check for next task
     if len(thread_data.get('tasks')) > 1:
         thread_data['tasks'] = [thr_datum for thr_datum in thread_data['tasks'] if thr_datum['status'] != 'active']
@@ -478,8 +474,6 @@ def reminder_node_6(data):
 
         params = (new_trigger_message_sid, position_id, json.dumps(thread_data), current_date, reminder.trigger_message_sid, reminder.user_phone, thread_id,)
         update_table(sql, params)
-
-        # update_thread_position(trigger_message_sid, thread_id='1', position_id=position_id)
 
         msg = "Have you completed {} yet? 1 if YES, 2 if NO.".format(active_data['task'])
         reminder.send_msg(msg)
