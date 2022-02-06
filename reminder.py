@@ -18,11 +18,32 @@ class ReminderSession():
         self.from_ = conf.twilio_num_from_
 
 
-    def send_msg(self):
-        pass
+    def send_msg(self, msg):
 
-    def extract_past_barrier(self):
-        pass
+        send_msg(msg, self.user_phone, self.from_)
+
+    def extract_past_barrier(self, trigger_message_sid=None, user_phone=None):
+
+        if not trigger_message_sid:
+            trigger_message_sid = self.trigger_message_sid
+        if not user_phone:
+            user_phone = self.user_phone
+
+        sql = """
+            SELECT DISTINCT
+                trigger_message_sid,
+                barrier,
+                possibility,
+                COUNT(trigger_message_sid) OVER (PARTITION BY user_phone) AS num_task
+            FROM
+                kema_schedule
+            WHERE user_phone = %s
+                AND trigger_message_sid = %s;
+        """
+        prev_possibility = select_from_table(sql, (user_phone, trigger_message_sid,))
+        (_, barrier, possibility, num_task) = prev_possibility[0]
+
+        return (barrier, possibility)
 
     def extract_thread_data(self):
         pass
@@ -119,38 +140,20 @@ def reminder_node_1(data):
 
     # Read response
     current_date = datetime.now()
-    trigger_message_sid = data['trigger_message_sid']
-    trigger_text = data['trigger_text']
-    user_phone = data['user_phone']
-    from_ = conf.twilio_num_from_
+    reminder = ReminderSession(data)
 
     # Determine actions based on response
     if trigger_text == '1' or trigger_text.lower() in ('yes'):
         # Update kema_schedule database to end schedule
-        trigger_message_sid = data['trigger_message_sid']
-
-        # Select past barrier
-        sql = """
-            SELECT DISTINCT
-                trigger_message_sid,
-                barrier,
-                possibility,
-                COUNT(trigger_message_sid) OVER (PARTITION BY user_phone) AS num_task
-            FROM
-                kema_schedule
-            WHERE user_phone = %s
-                AND trigger_message_sid = %s;
-        """
-        prev_possibility = select_from_table(sql, (user_phone, trigger_message_sid,))
-        (_, barrier, possibility, num_task) = prev_possibility[0]
+        barrier, possibility = reminder.extract_past_barrier()
 
         msg = '''That's great! You're that much closer to the goal you set of: {}. Would you like me to end this reminder permanently or start again next week?\n1. End permanently\n2.Restart for next week'''.format(possibility)
-        send_msg(msg, user_phone, from_)
+        reminder.send_msg(msg)
 
         # Update position in kema_thread db
         thread_id = '1'
         next_position_id = '5'
-        update_thread_position(trigger_message_sid, thread_id=thread_id, position_id=next_position_id, user_phone=user_phone)
+        update_thread_position(reminder.trigger_message_sid, thread_id=thread_id, position_id=next_position_id, user_phone=reminder.user_phone)
         return
 
     elif trigger_text == '2' or trigger_text.lower() in ('no'):
@@ -173,22 +176,11 @@ def reminder_node_2(data):
     '''Terminal node to add a new barrier'''
 
     current_date = datetime.now()
-    trigger_message_sid = data['trigger_message_sid']
     new_barrier = data['trigger_text']
-    user_phone = data['user_phone']
-    from_ = conf.twilio_num_from_
+    reminder = ReminderSession(data)
 
     # Select past barrier
-    sql = """
-        SELECT DISTINCT
-            trigger_message_sid, barrier, possibility
-        FROM
-            kema_schedule
-        WHERE user_phone = %s
-            AND trigger_message_sid = %s;
-    """
-    prev_barriers = select_from_table(sql, (user_phone, trigger_message_sid,))
-    (trigger_message_sid, prev_barrier, possibility) = prev_barriers[0]
+    prev_barrier, possibility = reminder.extract_past_barrier()
 
     # Update kema_schedule
     updt_barriers = ','.join([prev_barrier,new_barrier])
@@ -200,27 +192,23 @@ def reminder_node_2(data):
         WHERE trigger_message_sid = %s;
         '''
 
-    params = (updt_barriers, current_date, trigger_message_sid,)
+    params = (updt_barriers, current_date, reminder.trigger_message_sid,)
     update_table(sql, params)
 
     # Clear path
     update_thread_position(trigger_message_sid, clear_thread=True)
 
     msg = ''' Got it! I'll remember that for the future. These are are the things that you said have blocked you from completing this task before: {}. Just remember your possibility:  {}. You can do it!'''.format(prev_barrier, possibility)
-    send_msg(msg, user_phone, from_)
+    reminder.send_msg(msg)
 
 
 def reminder_node_3(data):
     """  Multi-task version of reminder_node_1 """
 
-    # data = {'tasks':[{'user_phone': '123', 'task': 'task1', 'trigger_message_sid': 'sid1', 'status': 'test'}, {'user_phone': '123', 'task': 'task2', 'trigger_message_sid': 'sid2', 'status': 'dormant'}]}
-
     # Read response
     current_date = datetime.now()
-    trigger_message_sid = data['trigger_message_sid']
     trigger_text = data['trigger_text']
-    user_phone = data['user_phone']
-    from_ = conf.twilio_num_from_
+    reminder = ReminderSession(data)
     thread_id = '1'
 
     # Extract thread_data from kema_thread
@@ -231,7 +219,7 @@ def reminder_node_3(data):
             AND user_phone = %s
             AND thread_id = %s;
         '''
-    thread_data_extract = select_from_table(sql, (trigger_message_sid, user_phone, thread_id,))
+    thread_data_extract = select_from_table(sql, (reminder.trigger_message_sid, reminder.user_phone, thread_id,))
     (_, thread_data) = thread_data_extract[0]
 
     # Determine actions based on response
@@ -239,42 +227,30 @@ def reminder_node_3(data):
         active_task_data = thread_data['tasks'][0] # TODO: set this to search for active task
 
         # Select past barrier
-        sql = """
-            SELECT DISTINCT
-                trigger_message_sid,
-                barrier,
-                possibility,
-                COUNT(trigger_message_sid) OVER (PARTITION BY user_phone) AS num_task
-            FROM
-                kema_schedule
-            WHERE user_phone = %s
-                AND trigger_message_sid = %s;
-        """
-        prev_possibility = select_from_table(sql, (user_phone, trigger_message_sid,))
-        (_, barrier, possibility, num_task) = prev_possibility[0]
+        barrier, possibility = reminder.extract_past_barrier()
 
         msg = '''That's great! You're that much closer to the goal you set of: {}. Would you like me to end this reminder permanently or start again next week?\n1. End permanently\n2.Restart for next week'''.format(possibility)
-        send_msg(msg, user_phone, from_)
+        reminder.send_msg(msg)
 
         # Update position in kema_thread db
         thread_id = '1'
         next_position_id = '6'
-        update_thread_position(trigger_message_sid, thread_id=thread_id, position_id=next_position_id, user_phone=user_phone)
+        update_thread_position(reminder.trigger_message_sid, thread_id=thread_id, position_id=next_position_id, user_phone=reminder.user_phone)
         return
 
     elif trigger_text == '2' or trigger_text.lower() in ('no'):
         msg = '''What is keeping you from completing this task?'''
-        send_msg(msg, user_phone, from_)
+        reminder.send_msg(msg)
         thread_id = '1'
         next_position_id = '4'
 
         # Update position in kema_thread db
-        update_thread_position(trigger_message_sid, thread_id=thread_id, position_id=next_position_id, user_phone=user_phone)
+        update_thread_position(reminder.trigger_message_sid, thread_id=thread_id, position_id=next_position_id, user_phone=reminder.user_phone)
         print('updated thread position to ', thread_id, next_position_id)
         return
     else:
         msg = ''' Sorry I didn't understand that. '''
-        send_msg(msg, user_phone, from_)
+        reminder.send_msg(msg)
         return
 
 
@@ -283,10 +259,8 @@ def reminder_node_4(data):
 
     # Read response
     current_date = datetime.now()
-    trigger_message_sid = data['trigger_message_sid']
     new_barrier = data['trigger_text']
-    user_phone = data['user_phone']
-    from_ = conf.twilio_num_from_
+    reminder = ReminderSession(data)
     thread_id = '1'
 
     # Extract thread_data from kema_thread
@@ -301,18 +275,10 @@ def reminder_node_4(data):
     (_, thread_data) = thread_data_extract[0]
 
     # Select past barrier
-    sql = """
-        SELECT DISTINCT
-            trigger_message_sid, barrier, possibility
-        FROM
-            kema_schedule
-        WHERE user_phone = %s
-            AND trigger_message_sid = %s;
-    """
+    prev_barrier, possibility = reminder.extract_past_barrier()
 
-     # need to specify trigger_message_sid here?
-    prev_barriers = select_from_table(sql, (user_phone,trigger_message_sid,))
-    (trigger_message_sid, prev_barrier, possibility) = prev_barriers[0]
+    msg = '''That's great! You're that much closer to the goal you set of: {}. Would you like me to end this reminder permanently or start again next week?\n1. End permanently\n2.Restart for next week'''.format(possibility)
+    reminder.send_msg(msg)
 
     # Update kema_schedule
     updt_barriers = ','.join([prev_barrier,new_barrier])
@@ -324,12 +290,11 @@ def reminder_node_4(data):
         WHERE trigger_message_sid = %s;
         '''
 
-    params = (updt_barriers, current_date, trigger_message_sid,)
+    params = (updt_barriers, current_date, reminder.trigger_message_sid,)
     update_table(sql, params)
 
     msg = ''' Got it! I'll remember that for the future. These are are the things that you said have blocked you from completing this task before: {}. Just remember your possibility:  {}. You can do it!'''.format(prev_barrier, possibility)
-    send_msg(msg, user_phone, from_)
-
+    reminder.send_msg(msg)
 
     # Send status check for next task
     if len(thread_data.get('tasks')) > 1:
@@ -357,11 +322,11 @@ def reminder_node_4(data):
                 AND thread_id = %s;
             '''
 
-        params = (new_trigger_message_sid, position_id, json.dumps(thread_data), current_date, trigger_message_sid, user_phone, thread_id,)
+        params = (new_trigger_message_sid, position_id, json.dumps(thread_data), current_date, reminder.trigger_message_sid, reminder.user_phone, thread_id,)
         update_table(sql, params)
 
         msg = "Have you completed {} yet? 1 if YES, 2 if NO.".format(active_data['task'])
-        send_msg(msg, user_phone, from_)
+        reminder.send_msg(msg)
     else:
         raise ValueError('This scenario has not been built yet.')
 
@@ -373,30 +338,15 @@ def reminder_node_5(data):
 
     # Read response
     current_date = datetime.now()
-    trigger_message_sid = data['trigger_message_sid']
     trigger_text = data['trigger_text']
-    user_phone = data['user_phone']
-    from_ = conf.twilio_num_from_
+    reminder = ReminderSession(data)
 
     # Determine actions based on response
     if trigger_text == '1' or trigger_text.lower() in ('yes') or trigger_text == '2' or trigger_text.lower() in ('no'):
         # Update kema_schedule database to delay schedule
-        trigger_message_sid = data['trigger_message_sid']
 
         # Select past barrier
-        sql = """
-            SELECT DISTINCT
-                trigger_message_sid,
-                barrier,
-                possibility,
-                COUNT(trigger_message_sid) OVER (PARTITION BY user_phone) AS num_task
-            FROM
-                kema_schedule
-            WHERE user_phone = %s
-                AND trigger_message_sid = %s;
-        """
-        prev_possibility = select_from_table(sql, (user_phone, trigger_message_sid,))
-        (_, barrier, possibility, num_task) = prev_possibility[0]
+        barrier, possibility = reminder.extract_past_barrier()
 
         if trigger_text == '1' or trigger_text.lower() in ('yes'):
             # Update schedule_start to the next week
@@ -408,11 +358,11 @@ def reminder_node_5(data):
                 WHERE trigger_message_sid = %s
                 '''
 
-            params = (strt_nxt_wk, current_date, trigger_message_sid,)
+            params = (strt_nxt_wk, current_date, reminder.trigger_message_sid,)
             update_table(sql, params)
 
             msg = '''That's great! I'll remind you next week. You're that much closer to the goal you set of: {}. You can do it!'''.format(possibility)
-            send_msg(msg, user_phone, from_)
+            reminder.send_msg(msg)
 
         elif trigger_text == '2' or trigger_text.lower() in ('no'):
             # End schedule permanently
@@ -423,18 +373,18 @@ def reminder_node_5(data):
                 WHERE trigger_message_sid = %s
                 '''
 
-            params = (current_date, trigger_message_sid,)
+            params = (current_date, reminder.trigger_message_sid,)
             update_table(sql, params)
 
             msg = '''That's great! You're that much closer to the goal you set of: {}. You can do it!'''.format(possibility)
-            send_msg(msg, user_phone, from_)
+            reminder.send_msg(msg)
 
     else:
         msg = ''' Sorry I didn't understand that. '''
-        send_msg(msg, user_phone, from_)
+        reminder.send_msg(msg)
 
     # Clear path
-    update_thread_position(trigger_message_sid, clear_thread=True)
+    update_thread_position(reminder.trigger_message_sid, clear_thread=True)
 
 
 def reminder_node_6(data):
@@ -445,10 +395,8 @@ def reminder_node_6(data):
 
     # Read response
     current_date = datetime.now()
-    trigger_message_sid = data['trigger_message_sid']
     trigger_text = data['trigger_text']
-    user_phone = data['user_phone']
-    from_ = conf.twilio_num_from_
+    reminder = ReminderSession(data)
     thread_id = '1'
 
     # Extract thread_data from kema_thread
@@ -459,7 +407,7 @@ def reminder_node_6(data):
             AND user_phone = %s
             AND thread_id = %s;
         '''
-    thread_data_extract = select_from_table(sql, (trigger_message_sid, user_phone, thread_id,))
+    thread_data_extract = select_from_table(sql, (reminder.trigger_message_sid, reminder.user_phone, thread_id,))
     (_, thread_data) = thread_data_extract[0]
 
     # Get active_task
@@ -474,11 +422,11 @@ def reminder_node_6(data):
             WHERE trigger_message_sid = %s;
             '''
 
-        params = (strt_nxt_wk, current_date, trigger_message_sid,)
+        params = (strt_nxt_wk, current_date, reminder.trigger_message_sid,)
         update_table(sql, params)
 
         msg = '''Ok I've ended reminders for this task.'''
-        send_msg(msg, user_phone, from_)
+        reminder.send_msg(msg)
 
     elif trigger_text == '2':
         # Update schedule_start to the next week
@@ -490,17 +438,17 @@ def reminder_node_6(data):
             WHERE trigger_message_sid = %s;
             '''
 
-        params = (strt_nxt_wk, current_date, trigger_message_sid,)
+        params = (strt_nxt_wk, current_date, reminder.trigger_message_sid,)
         update_table(sql, params)
 
         msg = '''Ok I've updated the schedule to start next week for this task.'''
-        send_msg(msg, user_phone, from_)
+        reminder.send_msg(msg)
     else:
-        msg = ''' Sorry I didn't understand that. '''
-        send_msg(msg, user_phone, from_)
+        msg = '''Sorry I didn't understand that.'''
+        reminder.send_msg(msg)
 
         # Clear path
-        update_thread_position(trigger_message_sid, clear_thread=True)
+        update_thread_position(reminder.trigger_message_sid, clear_thread=True)
         return
 
 
@@ -528,13 +476,13 @@ def reminder_node_6(data):
                 AND thread_id = %s;
             '''
 
-        params = (new_trigger_message_sid, position_id, json.dumps(thread_data), current_date, trigger_message_sid, user_phone, thread_id,)
+        params = (new_trigger_message_sid, position_id, json.dumps(thread_data), current_date, reminder.trigger_message_sid, reminder.user_phone, thread_id,)
         update_table(sql, params)
 
         # update_thread_position(trigger_message_sid, thread_id='1', position_id=position_id)
 
         msg = "Have you completed {} yet? 1 if YES, 2 if NO.".format(active_data['task'])
-        send_msg(msg, user_phone, from_)
+        reminder.send_msg(msg)
 
 def create_reminder(data):
     ''' Thread for setting up a new reminder '''
