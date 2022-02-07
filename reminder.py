@@ -72,19 +72,21 @@ class ReminderSession():
         (trigger_message_sid, thread_data) = thread_data_extract[0]
         return (trigger_message_sid, thread_data)
 
-    def set_table_values(table, param_dict, trigger_message_sid=None, user_phone=None):
+    def set_table_values(self, table_name, param_dict, trigger_message_sid=None, user_phone=None):
         '''param_dict: dictionary of col:value pairs to be updated'''
 
         current_date = datetime.now()
 
         # Construct SQL query
-        updt_clause = '''UPDATE %s '''
-        set_clause = ' SET ' + ' '.join(['{} = %s'.format(col) for col,val in param_dict.items()]) + ' update_datetime = %s '
+        updt_clause = '''UPDATE {} '''.format(table_name)
+        set_clause = ' SET ' + ', '.join(['{} = %s'.format(col) for col,val in param_dict.items()]) + ', update_datetime = %s '
         where_clause = ''' WHERE trigger_message_sid = %s AND user_phone = %s;'''
         sql = updt_clause + set_clause + where_clause
 
         # Construct tuple of parameters
-        params = tuple(table_name) + tuple(param_dict.values()) + tuple(current_date, self.trigger_message_sid, self.user_phone)
+        params = tuple(param_dict.values()) + (current_date, self.trigger_message_sid, self.user_phone,)
+        print(sql)
+        print(params, type(params))
         update_table(sql, params)
 
     def get_active_task(self):
@@ -182,7 +184,7 @@ def reminder_node_1(data):
     reminder = ReminderSession(data)
 
     # Determine actions based on response
-    if trigger_text == '1' or trigger_text.lower() in ('yes'):
+    if reminder.trigger_text == '1' or reminder.trigger_text.lower() in ('yes'):
         # Update kema_schedule database to end schedule
         barrier, possibility = reminder.extract_past_barrier()
 
@@ -195,21 +197,21 @@ def reminder_node_1(data):
         update_thread_position(reminder.trigger_message_sid, thread_id=thread_id, position_id=next_position_id, user_phone=reminder.user_phone)
         return
 
-    elif trigger_text == '2' or trigger_text.lower() in ('no'):
+    elif reminder.trigger_text == '2' or reminder.trigger_text.lower() in ('no'):
         msg = '''What is keeping you from completing this task?'''
         reminder.send_msg(msg)
         thread_id = '1'
         next_position_id = '2'
 
         # Update position in kema_thread db
-        update_thread_position(trigger_message_sid, thread_id=thread_id, position_id=next_position_id, user_phone=user_phone)
+        update_thread_position(reminder.trigger_message_sid, thread_id=thread_id, position_id=next_position_id, user_phone=reminder.user_phone)
         return
     else:
         msg = ''' Sorry I didn't understand that. '''
         reminder.send_msg(msg)
 
     # Clear path
-    update_thread_position(trigger_message_sid, clear_thread=True)
+    update_thread_position(reminder.trigger_message_sid, clear_thread=True)
 
 def reminder_node_2(data):
     '''Terminal node to add a new barrier'''
@@ -225,9 +227,8 @@ def reminder_node_2(data):
     updt_barriers = ','.join([prev_barrier,new_barrier])
     reminder.set_table_values('kema_schedule', {'barrier':updt_barriers})
 
-
     # Clear path
-    update_thread_position(trigger_message_sid, clear_thread=True)
+    update_thread_position(reminder.trigger_message_sid, clear_thread=True)
 
     msg = ''' Got it! I'll remember that for the future. These are are the things that you said have blocked you from completing this task before: {}. Just remember your possibility:  {}. You can do it!'''.format(prev_barrier, possibility)
     reminder.send_msg(msg)
@@ -238,7 +239,6 @@ def reminder_node_3(data):
 
     # Read response
     current_date = datetime.now()
-    trigger_text = data['trigger_text']
     reminder = ReminderSession(data)
     thread_id = '1'
 
@@ -246,7 +246,7 @@ def reminder_node_3(data):
     _, thread_data = reminder.extract_thread_data(thread_id=thread_id)
 
     # Determine actions based on response
-    if trigger_text == '1' or trigger_text.lower() in ('yes'):
+    if reminder.trigger_text == '1' or reminder.trigger_text.lower() in ('yes'):
         active_task_data = thread_data['tasks'][0] # TODO: set this to search for active task
 
         # Select past barrier
@@ -261,7 +261,7 @@ def reminder_node_3(data):
         update_thread_position(reminder.trigger_message_sid, thread_id=thread_id, position_id=next_position_id, user_phone=reminder.user_phone)
         return
 
-    elif trigger_text == '2' or trigger_text.lower() in ('no'):
+    elif reminder.trigger_text == '2' or reminder.trigger_text.lower() in ('no'):
         msg = '''What is keeping you from completing this task?'''
         reminder.send_msg(msg)
         thread_id = '1'
@@ -281,7 +281,6 @@ def reminder_node_4(data):
     """  Multi-task version of reminder_node_2: append new barrier """
 
     # Read response
-    current_date = datetime.now()
     new_barrier = data['trigger_text']
     reminder = ReminderSession(data)
     thread_id = '1'
@@ -289,18 +288,17 @@ def reminder_node_4(data):
     # Extract thread_data from kema_thread
     _, thread_data = reminder.extract_thread_data(thread_id=thread_id)
 
+    print('current trigger_message_sid = {} '.format(_), 'reminder_node_4')
+
     # Select past barrier
     prev_barrier, possibility = reminder.extract_past_barrier()
 
-    msg = '''That's great! You're that much closer to the goal you set of: {}. Would you like me to end this reminder permanently or start again next week?\n1. End permanently\n2.Restart for next week'''.format(possibility)
-    reminder.send_msg(msg)
+    # msg = '''That's great! You're that much closer to the goal you set of: {}. Would you like me to end this reminder permanently or start again next week?\n1. End permanently\n2.Restart for next week'''.format(possibility)
+    # reminder.send_msg(msg)
 
     # Update kema_schedule with new barrier
     updt_barriers = ','.join([prev_barrier,new_barrier])
     reminder.set_table_values('kema_schedule', {'barrier':updt_barriers})
-
-    params = (updt_barriers, current_date, reminder.trigger_message_sid,)
-    update_table(sql, params)
 
     msg = ''' Got it! I'll remember that for the future. These are are the things that you said have blocked you from completing this task before: {}. Just remember your possibility:  {}. You can do it!'''.format(prev_barrier, possibility)
     reminder.send_msg(msg)
@@ -344,13 +342,13 @@ def reminder_node_5(data):
     reminder = ReminderSession(data)
 
     # Determine actions based on response
-    if trigger_text == '1' or trigger_text.lower() in ('yes') or trigger_text == '2' or trigger_text.lower() in ('no'):
+    if reminder.trigger_text == '1' or reminder.trigger_text.lower() in ('yes') or reminder.trigger_text == '2' or reminder.trigger_text.lower() in ('no'):
         # Update kema_schedule database to delay schedule
 
         # Select past barrier
         barrier, possibility = reminder.extract_past_barrier()
 
-        if trigger_text == '1' or trigger_text.lower() in ('yes'):
+        if reminder.trigger_text == '1' or reminder.trigger_text.lower() in ('yes'):
             # Update schedule_start to the next week
             strt_nxt_wk = current_date + timedelta(7) - timedelta(days=current_date.isoweekday() % 7)
             sql = '''
@@ -366,7 +364,7 @@ def reminder_node_5(data):
             msg = '''That's great! I'll remind you next week. You're that much closer to the goal you set of: {}. You can do it!'''.format(possibility)
             reminder.send_msg(msg)
 
-        elif trigger_text == '2' or trigger_text.lower() in ('no'):
+        elif reminder.trigger_text == '2' or reminder.trigger_text.lower() in ('no'):
             # End schedule permanently
             sql = '''
                 UPDATE kema_schedule
@@ -397,14 +395,13 @@ def reminder_node_6(data):
 
     # Read response
     current_date = datetime.now()
-    trigger_text = data['trigger_text']
     reminder = ReminderSession(data)
     thread_id = '1'
 
     # Extract thread_data from kema_thread
     _, thread_data = reminder.extract_thread_data(thread_id=thread_id)
 
-    if trigger_text == '1':
+    if reminder.trigger_text == '1':
         # End task
         sql = '''
             UPDATE kema_schedule
@@ -419,7 +416,7 @@ def reminder_node_6(data):
         msg = '''Ok I've ended reminders for this task.'''
         reminder.send_msg(msg)
 
-    elif trigger_text == '2':
+    elif reminder.trigger_text == '2':
         # Update schedule_start to the next week
         strt_nxt_wk = current_date + timedelta(7) - timedelta(days=current_date.isoweekday() % 7)
         sql = '''
