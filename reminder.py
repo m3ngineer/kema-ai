@@ -89,6 +89,30 @@ class ReminderSession():
         print(params, type(params))
         update_table(sql, params)
 
+    def update_thread_data(self, data, thread_data, thread_id, position_id):
+
+        current_date = datetime.now()
+        trigger_message_sid = data['trigger_message_sid']
+        trigger_text = data['trigger_text']
+        user_phone = data['user_phone']
+        from_ = conf.twilio_num_from_
+        if type(thread_data) = dict:
+            thread_data = json.dumps(thread_data)
+
+        sql = '''
+            UPDATE kema_thread
+            SET
+                position_id = %s,
+                thread_data = thread_data::jsonb || %s::jsonb,
+                update_datetime = %s
+            WHERE trigger_message_sid = %s
+                AND user_phone = %s
+                AND thread_id = %s;
+            '''
+
+        params = (position_id, thread_data, current_date, trigger_message_sid, user_phone, thread_id,)
+        update_table(sql, params)
+
     def get_active_task(self):
         pass
 
