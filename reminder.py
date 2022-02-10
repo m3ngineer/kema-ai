@@ -89,28 +89,27 @@ class ReminderSession():
         print(params, type(params))
         update_table(sql, params)
 
-    def update_thread_data(self, data, thread_data, thread_id, position_id):
+    def append_thread_data(self, thread_data, thread_id, position_id):
+        '''Appends new dictionary or json to existing json in ongoing thread in kema_thread table'''
 
         current_date = datetime.now()
-        trigger_message_sid = data['trigger_message_sid']
-        trigger_text = data['trigger_text']
-        user_phone = data['user_phone']
-        from_ = conf.twilio_num_from_
         if type(thread_data) = dict:
             thread_data = json.dumps(thread_data)
 
         sql = '''
-            UPDATE kema_thread
+            UPDATE
+                kema_thread
             SET
                 position_id = %s,
                 thread_data = thread_data::jsonb || %s::jsonb,
                 update_datetime = %s
-            WHERE trigger_message_sid = %s
-                AND user_phone = %s
-                AND thread_id = %s;
+            WHERE
+                trigger_message_sid = %s AND
+                user_phone = %s AND
+                thread_id = %s;
             '''
 
-        params = (position_id, thread_data, current_date, trigger_message_sid, user_phone, thread_id,)
+        params = (position_id, thread_data, current_date, reminder.trigger_message_sid, reminder.user_phone, thread_id,)
         update_table(sql, params)
 
     def get_active_task(self):
@@ -512,158 +511,61 @@ def create_reminder(data):
 def create_node_1(data):
 
     # Accept answer from create_reminder()
-    current_date = datetime.now()
-    trigger_message_sid = data['trigger_message_sid']
-    trigger_text = data['trigger_text']
-    user_phone = data['user_phone']
-    from_ = conf.twilio_num_from_
-    thread_data = json.dumps({'task': trigger_text})
-    thread_id, position_id = ('0', '2')
-
-    sql = '''
-        UPDATE kema_thread
-        SET
-            position_id = %s,
-            thread_data = thread_data::jsonb || %s::jsonb,
-            update_datetime = %s
-        WHERE trigger_message_sid = %s
-            AND user_phone = %s
-            AND thread_id = %s;
-        '''
-
-    params = (position_id, thread_data, current_date, trigger_message_sid, user_phone, thread_id,)
-    update_table(sql, params)
+    thread_data = json.dumps({'task': data['trigger_text']})
+    reminder = ReminderSession(data)
+    reminder.append_thread_data(thread_data, thread_id='0', position_id='2')
 
     # Barrier
     msg = '''What has been holding you back from completing this? What are you afraid of?'''
-    send_msg(msg, user_phone, from_)
+    reminder.send_msg(msg)
 
 def create_node_2(data):
 
     # Accept answer from create_reminder()
-    current_date = datetime.now()
-    trigger_message_sid = data['trigger_message_sid']
-    trigger_text = data['trigger_text']
-    user_phone = data['user_phone']
-    from_ = conf.twilio_num_from_
-    thread_data = json.dumps({'barrier': trigger_text})
-    thread_id, position_id = ('0', '3')
-
-    sql = '''
-        UPDATE kema_thread
-        SET
-            position_id = %s,
-            thread_data = thread_data::jsonb || %s::jsonb,
-            update_datetime = %s
-        WHERE trigger_message_sid = %s
-            AND user_phone = %s
-            AND thread_id = %s;
-        '''
-
-    params = (position_id, thread_data, current_date, trigger_message_sid, user_phone, thread_id,)
-    update_table(sql, params)
+    thread_data = json.dumps({'barrier': data['trigger_text']})
+    reminder = ReminderSession(data)
+    reminder.append_thread_data(thread_data, thread_id='0', position_id='3')
 
     # Possibility
     msg = '''What's the consequence of not doing this thing? What possibility are you creating by doing this?'''
-    send_msg(msg, user_phone, from_)
+    reminder.send_msg(msg)
 
 def create_node_3(data):
 
     # Accept answer from create_reminder()
-    current_date = datetime.now()
-    trigger_message_sid = data['trigger_message_sid']
-    trigger_text = data['trigger_text']
-    user_phone = data['user_phone']
-    from_ = conf.twilio_num_from_
-    thread_data = json.dumps({'possibility': trigger_text})
-    thread_id, position_id = ('0', '4')
-
-    sql = '''
-        UPDATE kema_thread
-        SET
-            position_id = %s,
-            thread_data = thread_data::jsonb || %s::jsonb,
-            update_datetime = %s
-        WHERE trigger_message_sid = %s
-            AND user_phone = %s
-            AND thread_id = %s;
-        '''
-
-    params = (position_id, thread_data, current_date, trigger_message_sid, user_phone, thread_id,)
-    update_table(sql, params)
+    thread_data = json.dumps({'possibility': data['trigger_text']})
+    reminder = ReminderSession(data)
+    reminder.append_thread_data(thread_data, thread_id='0', position_id='4')
 
     # Schedule deadline
     msg = '''I'm so glad that you shared that with me :) Let's set a date for when you will accomplish this task by. When will you commit to doing this?'''
-    send_msg(msg, user_phone, from_)
+    reminder.send_msg(msg)
 
 def create_node_4(data):
 
     # Accept answer from create_reminder()
-    current_date = datetime.now()
-    trigger_message_sid = data['trigger_message_sid']
-    trigger_text = data['trigger_text']
-    user_phone = data['user_phone']
-    from_ = conf.twilio_num_from_
-    thread_data = json.dumps({'schedule_deadline_input': trigger_text})
-    thread_id, position_id = ('0', '5')
-
-    sql = '''
-        UPDATE kema_thread
-        SET
-            position_id = %s,
-            thread_data = thread_data::jsonb || %s::jsonb,
-            update_datetime = %s
-        WHERE trigger_message_sid = %s
-            AND user_phone = %s
-            AND thread_id = %s;
-        '''
-
-    params = (position_id, thread_data, current_date, trigger_message_sid, user_phone, thread_id,)
-    update_table(sql, params)
+    thread_data = json.dumps({'schedule_deadline_input': data['trigger_text']})
+    reminder = ReminderSession(data)
+    reminder.append_thread_data(thread_data, thread_id='0', position_id='5')
 
     # Schedule period
     msg = '''Great! I can send you weekly reminders before this deadline. What days would you like to be reminded? You can also say weekdays, daily, weekend, etc.'''
-    send_msg(msg, user_phone, from_)
+    reminder.send_msg(msg)
 
 def create_node_5(data):
 
     # Accept answer from create_reminder()
-    current_date = datetime.now()
-    trigger_message_sid = data['trigger_message_sid']
-    trigger_text = data['trigger_text']
-    user_phone = data['user_phone']
-    from_ = conf.twilio_num_from_
-    thread_data = json.dumps({'schedule_period_input': trigger_text})
-    thread_id = '0'
-
-    sql = '''
-        UPDATE kema_thread
-        SET
-            thread_data = thread_data::jsonb || %s::jsonb,
-            update_datetime = %s
-        WHERE trigger_message_sid = %s
-            AND user_phone = %s
-            AND thread_id = %s;
-        '''
-
-    params = (thread_data, current_date, trigger_message_sid, user_phone, thread_id,)
-    update_table(sql, params)
+    thread_data = json.dumps({'schedule_period_input': data['trigger_text']})
+    reminder = ReminderSession(data)
+    reminder.append_thread_data(thread_data, thread_id='0', position_id='6')
 
     # Update kema_schedule with collected data over course of thread
     # Extract thread data
-    sql = '''
-        SELECT trigger_message_sid, thread_data FROM kema_thread
-        WHERE
-            trigger_message_sid = %s
-            AND user_phone = %s
-            AND thread_id = %s;
-        '''
-    insert_data = select_from_table(sql, (trigger_message_sid, user_phone, thread_id,))
-    (_, thread_insert_data) = insert_data[0]
+    _, thread_insert_data = reminder.extract_thread_data(thread_id='0')
 
     thread_insert_data_dict = {
-        'trigger_message_sid': trigger_message_sid,
-        'user_phone': user_phone,
+        'trigger_message_sid': reminder.trigger_message_sid,
+        'user_phone': reminder.user_phone,
         'trigger_text': thread_insert_data['trigger_text'],
         'task': thread_insert_data['task'],
         'barrier': thread_insert_data['barrier'],
@@ -676,10 +578,10 @@ def create_node_5(data):
 
     # Confirm Time
     msg = '''Ok! I'll remind you on those days'''
-    send_msg(msg, user_phone, from_)
+    reminder.send_msg(msg)
 
     # Clear path
-    update_thread_position(trigger_message_sid, clear_thread=True)
+    update_thread_position(reminder.trigger_message_sid, clear_thread=True)
 
 def retrieve_reminders(data):
     ''' Retrieve active tasks '''
