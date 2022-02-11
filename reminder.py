@@ -17,9 +17,8 @@ class ReminderSession():
         self.user_phone = data['user_phone']
         self.from_ = conf.twilio_num_from_
 
-
     def send_msg(self, msg):
-
+        
         send_msg(msg, self.user_phone, self.from_)
 
     def extract_past_barrier(self, trigger_message_sid=None, user_phone=None):
@@ -65,7 +64,7 @@ class ReminderSession():
         if thread_id:
             sql = sql + ''' AND thread_id = %s;'''
         else:
-            sql = sql + ''' AND thread_id = '1';'''
+            sql = sql + ''' AND thread_id = %s;'''
             thread_id = '1'
 
         thread_data_extract = select_from_table(sql, (self.trigger_message_sid, self.user_phone, thread_id,))
@@ -115,19 +114,39 @@ class ReminderSession():
     def get_active_task(self):
         pass
 
-    def update_schedule(self, trigger_message_sid):
+    def update_schedule(self, trigger_message_sid=None, schedule_start=None, schedule_end=None):
+        """Updates the schedule start or end date of a task
 
+        Parameters:
+        trigger_message_sid (str): Trigger message SID to search kema_schedule table for
+        schedule_start (date): Start date to update the schedule to
+        schedule_end (date, bool): End date to update the schedule to. If True, cancels the schedule
+        """
         current_date = datetime.now()
+        if not trigger_message_sid:
+            trigger_message_sid = self.trigger_message_sid
+        params = tuple()
+
         sql = '''
             UPDATE
                 kema_schedule
             SET
-                schedule_end = schedule_start - INTERVAL '1 DAY',
-                update_datetime = %s
-            WHERE trigger_message_sid = %s
+            '''
+        if schedule_start:
+            sql += '''schedule_start = %s, '''
+            params += (schedule_start,)
+        if schedule_end is True:
+            # Cancel schedule
+            sql += '''schedule_end = schedule_start - INTERVAL '1 DAY', '''
+        elif schedule_end:
+            sql += '''schedule_end = %s, '''
+            params += (schedule_start,)
+
+        sql += '''update_datetime = %s
+            WHERE trigger_message_sid = %s;
             '''
 
-        params = (current_date, reminder.trigger_message_sid,)
+        params += (current_date, reminder.trigger_message_sid,)
         update_table(sql, params)
 
     def check_status_next_task(self):
@@ -386,30 +405,14 @@ def reminder_node_5(data):
         if reminder.trigger_text == '1' or reminder.trigger_text.lower() in ('yes'):
             # Update schedule_start to the next week
             strt_nxt_wk = current_date + timedelta(7) - timedelta(days=current_date.isoweekday() % 7)
-            sql = '''
-                UPDATE kema_schedule
-                SET schedule_start = %s,
-                    update_datetime = %s
-                WHERE trigger_message_sid = %s
-                '''
-
-            params = (strt_nxt_wk, current_date, reminder.trigger_message_sid,)
-            update_table(sql, params)
+            reminder.update_schedule(schedule_start=strt_nxt_wk)
 
             msg = '''That's great! I'll remind you next week. You're that much closer to the goal you set of: {}. You can do it!'''.format(possibility)
             reminder.send_msg(msg)
 
         elif reminder.trigger_text == '2' or reminder.trigger_text.lower() in ('no'):
             # End schedule permanently
-            sql = '''
-                UPDATE kema_schedule
-                SET schedule_end = schedule_start - INTERVAL '1 DAY',
-                    update_datetime = %s
-                WHERE trigger_message_sid = %s
-                '''
-
-            params = (current_date, reminder.trigger_message_sid,)
-            update_table(sql, params)
+            reminder.update_schedule(schedule_end=True)
 
             msg = '''That's great! You're that much closer to the goal you set of: {}. You can do it!'''.format(possibility)
             reminder.send_msg(msg)
@@ -437,16 +440,8 @@ def reminder_node_6(data):
     _, thread_data = reminder.extract_thread_data(thread_id=thread_id)
 
     if reminder.trigger_text == '1':
-        # End task
-        sql = '''
-            UPDATE kema_schedule
-            SET schedule_end = schedule_start - INTERVAL 1 DAY,
-                update_datetime = %s
-            WHERE trigger_message_sid = %s;
-            '''
-
-        params = (strt_nxt_wk, current_date, reminder.trigger_message_sid,)
-        update_table(sql, params)
+        # End schedule permanently
+        reminder.update_schedule(schedule_end=True)
 
         msg = '''Ok I've ended reminders for this task.'''
         reminder.send_msg(msg)
@@ -454,15 +449,7 @@ def reminder_node_6(data):
     elif reminder.trigger_text == '2':
         # Update schedule_start to the next week
         strt_nxt_wk = current_date + timedelta(7) - timedelta(days=current_date.isoweekday() % 7)
-        sql = '''
-            UPDATE kema_schedule
-            SET schedule_start = %s,
-                update_datetime = %s
-            WHERE trigger_message_sid = %s;
-            '''
-
-        params = (strt_nxt_wk, current_date, reminder.trigger_message_sid,)
-        update_table(sql, params)
+        reminder.update_schedule(schedule_start=strt_nxt_wk)
 
         msg = '''Ok I've updated the schedule to start next week for this task.'''
         reminder.send_msg(msg)
@@ -668,30 +655,16 @@ def delete_reminder_node_1(data):
     """Accept response for number of task to remove"""
 
     current_date = datetime.now()
-    trigger_message_sid = data['trigger_message_sid']
+    reminder = ReminderSession(data)
     trigger_text = data['trigger_text']
-    user_phone = data['user_phone']
-    from_ = conf.twilio_num_from_
-    thread_id = '2'
 
     if trigger_text.strip() == '0':
         # User exits delete thread
         return
 
     # Extract trigger text and match task number to delete
-    sql = '''
-        SELECT
-            trigger_message_sid,
-            thread_data
-        FROM
-            kema_thread
-        WHERE
-            trigger_message_sid = %s
-            AND user_phone = %s
-            AND thread_id = %s;
-        '''
-    thread_data = select_from_table(sql, (trigger_message_sid, user_phone, thread_id,))
-    (_, task_list) = thread_data[0]
+    _, thread_data = reminder.extract_thread_data(thread_id='2')
+    task_list = thread_data['task_list']
 
     task_to_delete = None
     for (msg_sid, task, task_num) in task_list['task_list']:
@@ -700,26 +673,16 @@ def delete_reminder_node_1(data):
 
     if task_to_delete:
         # Delete task
-        sql = '''
-            UPDATE
-                kema_schedule
-            SET
-                schedule_end = schedule_start - INTERVAL '1 DAY'
-            WHERE
-                trigger_message_sid = %s
-                AND user_phone = %s;
-            '''
-        update_table(sql, (trigger_message_sid, user_phone,))
+        reminder.update_schedule(schedule_end=True)
 
         # Send confirmation text
         msg = """The task {} has been deleted""".format(task_to_delete)
-        send_msg(msg, user_phone, from_)
+        reminder.send_msg(msg)
     else:
-        msg = """Ok no tasks were deleted"""
-        send_msg(msg, user_phone, from_)
+        reminder.send_msg("""Ok no tasks were deleted""")
 
     # Clear thread
-    update_thread_position(trigger_message_sid, clear_thread=True)
+    update_thread_position(reminder.trigger_message_sid, clear_thread=True)
 
 if __name__ == "__main__":
     to = conf.twilio_num_to
@@ -728,4 +691,4 @@ if __name__ == "__main__":
     data = {'user_phone': '+19148198579', 'trigger_text': 'list tasks', 'trigger_message_sid': 'test'}
     # send_reminder(to, from_, data=data)
 
-    retrieve_reminders(data)
+    # retrieve_reminders(data)
