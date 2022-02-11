@@ -93,7 +93,7 @@ class ReminderSession():
         '''Appends new dictionary or json to existing json in ongoing thread in kema_thread table'''
 
         current_date = datetime.now()
-        if type(thread_data) = dict:
+        if type(thread_data) == dict:
             thread_data = json.dumps(thread_data)
 
         sql = '''
@@ -109,14 +109,26 @@ class ReminderSession():
                 thread_id = %s;
             '''
 
-        params = (position_id, thread_data, current_date, reminder.trigger_message_sid, reminder.user_phone, thread_id,)
+        params = (position_id, thread_data, current_date, self.trigger_message_sid, self.user_phone, thread_id,)
         update_table(sql, params)
 
     def get_active_task(self):
         pass
 
-    def end_schedule_permanently(self):
-        pass
+    def update_schedule(self, trigger_message_sid):
+
+        current_date = datetime.now()
+        sql = '''
+            UPDATE
+                kema_schedule
+            SET
+                schedule_end = schedule_start - INTERVAL '1 DAY',
+                update_datetime = %s
+            WHERE trigger_message_sid = %s
+            '''
+
+        params = (current_date, reminder.trigger_message_sid,)
+        update_table(sql, params)
 
     def check_status_next_task(self):
         pass
