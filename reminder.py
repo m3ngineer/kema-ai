@@ -18,7 +18,7 @@ class ReminderSession():
         self.from_ = conf.twilio_num_from_
 
     def send_msg(self, msg):
-        
+
         send_msg(msg, self.user_phone, self.from_)
 
     def extract_past_barrier(self, trigger_message_sid=None, user_phone=None):
@@ -111,8 +111,22 @@ class ReminderSession():
         params = (position_id, thread_data, current_date, self.trigger_message_sid, self.user_phone, thread_id,)
         update_table(sql, params)
 
-    def get_active_task(self):
-        pass
+    def get_new_active_task(self, thread_data):
+        """Removes current active task and chooses new task as active
+
+        Parameters:
+        thread_data (dict): Contains list of task dictionaries with attribute status
+
+        Returns:
+        new_trigger_message_sid (str): Trigger message SID of new active task
+        thread_data (dict): Updated thread data with current active task removed and new one selected
+        """
+        thread_data['tasks'] = [thr_datum for thr_datum in thread_data['tasks'] if thr_datum['status'] != 'active']
+        thread_data['tasks'] = set_active_task(thread_data['tasks'])
+        active_data = thread_data['tasks'][0]
+        new_trigger_message_sid = active_data['trigger_message_sid']
+
+        return (new_trigger_message_sid, thread_data)
 
     def update_schedule(self, trigger_message_sid=None, schedule_start=None, schedule_end=None):
         """Updates the schedule start or end date of a task
@@ -359,12 +373,7 @@ def reminder_node_4(data):
 
     # Send status check for next task
     if len(thread_data.get('tasks')) > 1:
-        thread_data['tasks'] = [thr_datum for thr_datum in thread_data['tasks'] if thr_datum['status'] != 'active']
-        thread_data['tasks'] = set_active_task(thread_data['tasks'])
-        active_data = thread_data['tasks'][0]
-        new_trigger_message_sid = active_data['trigger_message_sid']
-
-        print(thread_data['tasks'])
+        new_trigger_message_sid, thread_data = reminder.get_new_active_task(thread_data)
         if len(thread_data['tasks']) == 1:
             position_id = '1'
         else:
@@ -463,10 +472,7 @@ def reminder_node_6(data):
 
     # Send status check for next task
     if len(thread_data.get('tasks')) > 1:
-        thread_data['tasks'] = [thr_datum for thr_datum in thread_data['tasks'] if thr_datum['status'] != 'active']
-        thread_data['tasks'] = set_active_task(thread_data['tasks'])
-        active_data = thread_data['tasks'][0]
-        new_trigger_message_sid = active_data['trigger_message_sid']
+        new_trigger_message_sid, thread_data = reminder.get_new_active_task(thread_data)
         if len(thread_data['tasks']) == 1:
             position_id = '1'
         else:
