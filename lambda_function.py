@@ -47,13 +47,8 @@ def lambda_inbound_message_handler(event, context):
     ###### FOR TESTING ########
 
     user_phone = data['user_phone']
-    # Check for position in previous conversation
-    trigger_message_sid, thread_id, position_id = check_user_thread_position(user_phone, data)
-    if trigger_message_sid:
-        # Reset trigger message SID if continuing a conversation thread
-        data['trigger_message_sid'] = trigger_message_sid
-        # Clear any other threads
-        clear_thread_for_user_phone(user_phone, exclude_trigger_message_sid=trigger_message_sid)
+
+    ### The following commands stop all existing threads ###
 
     # Check for STOP request and exit all threads if found
     if data['trigger_text'].lower() in ('stop', 'exit'):
@@ -76,6 +71,16 @@ def lambda_inbound_message_handler(event, context):
         clear_thread_for_user_phone(user_phone)
         create_reminder(data)
         return
+
+    ### End of commands that stop all existing threads ###
+
+    # Check for position in previous conversation
+    trigger_message_sid, thread_id, position_id = check_user_thread_position(user_phone, data)
+    if trigger_message_sid:
+        # Reset trigger message SID if continuing a conversation thread
+        data['trigger_message_sid'] = trigger_message_sid
+        # Clear any other threads
+        clear_thread_for_user_phone(user_phone, exclude_trigger_message_sid=trigger_message_sid)
 
     # If last conversation not ended
     print(trigger_message_sid, thread_id, position_id)
