@@ -5,6 +5,7 @@ import logging
 
 from datetime import datetime, timedelta
 from calendar import monthrange
+from dateutil.relativedelta import relativedelta
 
 class ScheduleParser():
     '''
@@ -69,6 +70,24 @@ class ScheduleParser():
         current_date = datetime.now().date()
 
         schedule_start, schedule_end = current_date, current_date
+
+        if 'end of' in text:
+            if 'next month' in text:
+                next_month = current_date + relativedelta(months=1)
+                day, month = monthrange(next_month.year, next_month.month)
+                schedule_end = datetime(
+                                    next_month.year,
+                                    month,
+                                    int(day)
+                                    ).date()
+            elif 'month' in text:
+                day, month = monthrange(current_date.year, current_date.month)
+                schedule_end = datetime(
+                                    current_date.year,
+                                    current_date.month,
+                                    int(day)
+                                    ).date()
+            return schedule_start.strftime('%Y-%m-%d'), schedule_end.strftime('%Y-%m-%d')
 
         month = search_dict(text, months)
         if month:
